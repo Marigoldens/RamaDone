@@ -1,0 +1,39 @@
+/* ===================================================
+   LANDING PAGE — LandingPage
+   =================================================== */
+
+/* ---- Decorative Orbs ---- */
+.orb-accent {
+  background: radial-gradient(circle, var(--c-accent) 0%, transparent 70%);
+}
+
+.orb-primary {
+  background: radial-gradient(circle, var(--c-primary) 0%, transparent 70%);
+}
+
+.orb-center {
+  background: radial-gradient(circle, var(--c-accent) 0%, transparent 60%);
+}
+
+/* ---- CTA Button / Moon icon ---- */
+.cta-gradient {
+  background: linear-gradient(135deg, var(--c-primary), var(--c-accent));
+  color: var(--c-surface);
+}
+
+/* ---- Feature Card Icon ---- */
+.feature-icon-gradient {
+  background: linear-gradient(135deg, var(--c-accent-glow), var(--c-accent));
+}
+
+/* ---- CTA desktop/mobile animation delay ---- */
+.landing-cta-delay {
+  animation-delay: 0.5s;
+  animation-fill-mode: forwards;
+}
+
+/* ---- Animation delays for feature cards (dynamic via landing-card-delay-N) ---- */
+.landing-card-delay-1 { animation-delay: 0.1s; animation-fill-mode: forwards; }
+.landing-card-delay-2 { animation-delay: 0.2s; animation-fill-mode: forwards; }
+.landing-card-delay-3 { animation-delay: 0.3s; animation-fill-mode: forwards; }
+.landing-card-delay-4 { animation-delay: 0.4s; animation-fill-mode: forwards; }

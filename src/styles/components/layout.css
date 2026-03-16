@@ -1,0 +1,182 @@
+/* ===================================================
+   LAYOUT — AppShell + BottomNav/SideNav
+   =================================================== */
+
+/* ---- App Shell ---- */
+.app-shell {
+  height: 100dvh;
+  background-color: var(--c-surface);
+  display: flex;
+  flex-direction: column-reverse; /* mobile: nav at bottom */
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .app-shell {
+    flex-direction: row; /* desktop: nav on left */
+  }
+}
+
+/* ---- Main Content Area ---- */
+.app-main {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* ---- Side/Bottom Navigation ---- */
+.app-nav {
+  z-index: 50;
+  flex-shrink: 0;
+  background-color: var(--c-nav-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-color: var(--c-border);
+  display: flex;
+  transition: all 0.3s ease;
+}
+
+/* Mobile: horizontal bottom bar */
+.app-nav {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-around;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  border-top-width: 1px;
+  border-top-style: solid;
+  height: calc(3.75rem + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.06);
+}
+
+/* Desktop: vertical left sidebar */
+@media (min-width: 768px) {
+  .app-nav {
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding-top: 1.5rem;
+    padding-bottom: 1.5rem;
+    padding-left: 0;
+    padding-right: 0;
+    border-top-width: 0;
+    border-right-width: 1px;
+    border-right-style: solid;
+    height: 100%;
+    width: 80px;
+    gap: 0.5rem;
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.06);
+  }
+}
+
+/* ---- Nav Logo / Brand mark (desktop only) ---- */
+.nav-brand {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .nav-brand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--c-primary), var(--c-accent));
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 12px var(--c-accent-glow);
+    flex-shrink: 0;
+  }
+}
+
+/* ---- Tab Button ---- */
+.nav-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  border-radius: 0.75rem;
+  position: relative;
+  transition: all 0.25s ease;
+  cursor: pointer;
+  width: 4rem;
+}
+
+@media (min-width: 768px) {
+  .nav-tab {
+    width: 56px;
+    padding: 0.625rem 0.5rem;
+    border-radius: 14px;
+  }
+}
+
+.nav-tab--active {
+  color: var(--c-accent);
+}
+
+.nav-tab--inactive {
+  color: var(--c-text-muted);
+}
+
+.nav-tab--inactive:hover {
+  color: var(--c-text);
+  background-color: var(--c-surface-elevated);
+}
+
+.nav-tab__icon-wrap {
+  padding: 0.375rem;
+  border-radius: 0.5rem;
+  transition: all 0.25s ease;
+}
+
+.nav-tab__icon-wrap--active {
+  background-color: color-mix(in srgb, var(--c-accent) 12%, transparent);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--c-accent-glow) 30%, transparent);
+}
+
+.nav-tab__label {
+  font-size: 9px;
+  font-weight: 700;
+  transition: all 0.25s;
+  margin-top: 0.125rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+@media (min-width: 768px) {
+  .nav-tab__label {
+    font-size: 9px;
+  }
+}
+
+.nav-tab__label--active {
+  opacity: 1;
+}
+
+.nav-tab__label--inactive {
+  opacity: 0.55;
+}
+
+/* Active indicator dot (desktop sidebar) */
+@media (min-width: 768px) {
+  .nav-tab--active::before {
+    content: '';
+    position: absolute;
+    left: -1px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 24px;
+    background-color: var(--c-accent);
+    border-radius: 0 2px 2px 0;
+  }
+}

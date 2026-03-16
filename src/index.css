@@ -1,0 +1,246 @@
+@import "tailwindcss";
+@import "./styles/components/layout.css";
+@import "./styles/components/calendar.css";
+@import "./styles/components/chat.css";
+@import "./styles/components/settings.css";
+@import "./styles/components/landing.css";
+
+/*
+ * ============================================================
+ * RAMADAN RHYTHM SCHEDULER — DESIGN TOKEN SYSTEM
+ * ============================================================
+ *
+ * WHY CSS VARIABLES?
+ * We use CSS custom properties (variables) so that theming is
+ * instantaneous — no JS re-render needed. Changing a class on
+ * <html> swaps the entire palette in a single repaint.
+ *
+ * HOW IT WORKS:
+ * 1. :root defines the default (light cream) theme.
+ * 2. .theme-dark and .theme-desert override those same vars.
+ * 3. Tailwind's @theme block maps these vars into utility classes
+ *    like bg-primary, text-surface, etc.
+ * ============================================================
+ */
+
+/* ---------- Tailwind v4 @theme block ---------- */
+@theme {
+  --color-primary: var(--c-primary);
+  --color-primary-light: var(--c-primary-light);
+  --color-surface: var(--c-surface);
+  --color-surface-elevated: var(--c-surface-elevated);
+  --color-text: var(--c-text);
+  --color-text-muted: var(--c-text-muted);
+  --color-accent: var(--c-accent);
+  --color-accent-glow: var(--c-accent-glow);
+  --color-prayer: var(--c-prayer);
+  --color-prayer-text: var(--c-prayer-text);
+  --color-iftar: var(--c-iftar);
+  --color-iftar-text: var(--c-iftar-text);
+  --color-border: var(--c-border);
+  --color-nav-bg: var(--c-nav-bg);
+
+  /* Font family */
+  --font-sans: 'Outfit', 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  
+  /* Glassmorphism & Shadow Tokens */
+  --shadow-premium: 0 10px 30px -5px rgba(0, 0, 0, 0.1), 0 4px 12px -4px rgba(0, 0, 0, 0.05);
+  --shadow-accent: 0 10px 20px -5px var(--c-accent-glow);
+
+  /* Spacing & Radius Tokens */
+  --radius-xl: 32px;
+  --radius-lg: 20px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+  
+  --spacing-screen: 24px;
+}
+
+/* ==========================================
+   DEFAULT THEME — Warm Cream / Light
+   ========================================== */
+:root {
+  --c-primary: #1e3a5f;
+  --c-primary-light: #2d5a8e;
+  --c-surface: #fdf6ec;
+  --c-surface-elevated: #ffffff;
+  --c-text: #1a1a2e;
+  --c-text-muted: #6b7280;
+  --c-accent: #c9a84c;
+  --c-accent-glow: rgba(201, 168, 76, 0.3);
+  --c-prayer: #1e3a5f;
+  --c-prayer-text: #e8dcc8;
+  --c-iftar: #c9a84c;
+  --c-iftar-text: #1a1a2e;
+  --c-border: #e5ddd0;
+  --c-nav-bg: #ffffff;
+}
+
+/* ==========================================
+   DARK THEME — Deep Navy
+   ========================================== */
+.theme-dark {
+  --c-primary: #60a5fa;
+  --c-primary-light: #93c5fd;
+  --c-surface: #0f172a;
+  --c-surface-elevated: #1e293b;
+  --c-text: #f1f5f9;
+  --c-text-muted: #94a3b8;
+  --c-accent: #f59e0b;
+  --c-accent-glow: rgba(245, 158, 11, 0.25);
+  --c-prayer: #1e3a5f;
+  --c-prayer-text: #93c5fd;
+  --c-iftar: #f59e0b;
+  --c-iftar-text: #0f172a;
+  --c-border: #334155;
+  --c-nav-bg: #1e293b;
+}
+
+/* ==========================================
+   DESERT THEME — Sand & Gold
+   ========================================== */
+.theme-desert {
+  --c-primary: #92400e;
+  --c-primary-light: #b45309;
+  --c-surface: #fef3c7;
+  --c-surface-elevated: #fffbeb;
+  --c-text: #451a03;
+  --c-text-muted: #78716c;
+  --c-accent: #d97706;
+  --c-accent-glow: rgba(217, 119, 6, 0.3);
+  --c-prayer: #78350f;
+  --c-prayer-text: #fef3c7;
+  --c-iftar: #d97706;
+  --c-iftar-text: #451a03;
+  --c-border: #d6d3d1;
+  --c-nav-bg: #fffbeb;
+}
+
+/* ==========================================
+   BASE STYLES
+   ========================================== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--c-surface);
+  color: var(--c-text);
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar styling that respects themes */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--c-text-muted);
+  border-radius: 3px;
+}
+
+/* ==========================================
+   ANIMATIONS
+   ========================================== */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px var(--c-accent-glow); }
+  50% { box-shadow: 0 0 40px var(--c-accent-glow), 0 0 60px var(--c-accent-glow); }
+}
+
+@keyframes crescent-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.6s ease-out forwards;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 25%,
+    var(--c-accent-glow) 50%,
+    transparent 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* ==========================================
+   PREMIUM UTILITIES
+   ========================================== */
+.glass-card {
+  background: rgba(var(--c-surface-elevated-rgb, 255, 255, 255), 0.7);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  border: 1px solid rgba(var(--c-text-rgb, 0, 0, 0), 0.08);
+}
+
+.theme-dark .glass-card {
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.premium-gradient {
+  background: linear-gradient(135deg, var(--c-primary) 0%, var(--c-primary-light) 100%);
+}
+
+.accent-gradient {
+  background: linear-gradient(135deg, var(--c-accent) 0%, #e8dcc8 100%);
+}
+
+.theme-dark .accent-gradient {
+  background: linear-gradient(135deg, var(--c-accent) 0%, #fbbf24 100%);
+}
