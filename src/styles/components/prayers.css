@@ -1,0 +1,172 @@
+.prayers-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 1.5rem;
+  background-color: var(--c-surface);
+  animation: fadeIn 0.4s ease-out;
+}
+
+.prayers-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.prayers-title {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: var(--c-text);
+  margin-bottom: 0.5rem;
+}
+
+.prayers-location-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.75rem;
+  background: var(--c-surface-elevated);
+  border: 1px solid var(--c-border);
+  border-radius: 9999px;
+  font-size: 0.8125rem;
+  color: var(--c-text-muted);
+}
+
+.prayers-nav {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.prayers-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.75rem;
+  background: var(--c-surface-elevated);
+  border: 1px solid var(--c-border);
+  color: var(--c-text);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.prayers-nav-btn:hover {
+  background: var(--c-border);
+  transform: translateY(-1px);
+}
+
+.prayers-loading-bar {
+  height: 3px;
+  width: 100%;
+  background: var(--c-accent-glow);
+  position: relative;
+  overflow: hidden;
+  border-radius: 3px;
+  margin-bottom: 1rem;
+}
+
+.prayers-loading-bar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 30%;
+  background: var(--c-accent);
+  animation: shimmer 1.5s infinite linear;
+}
+
+.prayers-table-container {
+  flex: 1;
+  overflow: auto;
+  background: var(--c-surface-elevated);
+  border-radius: 1.25rem;
+  border: 1px solid var(--c-border);
+  box-shadow: var(--shadow-premium);
+}
+
+.prayers-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.9375rem;
+}
+
+.prayers-table th {
+  padding: 1rem 1.25rem;
+  background: var(--c-surface-elevated);
+  border-bottom: 1px solid var(--c-border);
+  color: var(--c-text-muted);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.prayers-table td {
+  padding: 1.25rem;
+  border-bottom: 1px solid var(--c-border);
+  color: var(--c-text);
+}
+
+.sticky-col {
+  position: sticky;
+  left: 0;
+  background: var(--c-surface-elevated);
+  z-index: 5;
+  width: 120px;
+}
+
+.prayers-table th.sticky-col {
+  z-index: 15;
+}
+
+.day-cell {
+  display: flex;
+  flex-direction: column;
+}
+
+.day-num {
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.day-name {
+  font-size: 0.75rem;
+  color: var(--c-text-muted);
+  text-transform: uppercase;
+}
+
+.row-today {
+  background: rgba(201, 168, 76, 0.05);
+}
+
+.row-today td {
+  border-bottom-color: var(--c-accent);
+}
+
+.row-today .day-num {
+  color: var(--c-accent);
+}
+
+.highlight-maghrib {
+  color: var(--c-accent);
+  font-weight: 600;
+}
+
+/* Mobile optimizations */
+@media (max-width: 640px) {
+  .prayers-root {
+    padding: 1rem;
+    padding-bottom: 5rem; /* Space for BottomNav */
+  }
+  
+  .prayers-title {
+    font-size: 1.5rem;
+  }
+}

@@ -5,7 +5,7 @@ import { useMessages, useChatSessions } from '../../hooks/useMessages';
 import { useEvents } from '../../hooks/useEvents';
 import { useAllEvents } from '../../hooks/useEvents';
 import { usePreferences } from '../../hooks/usePreferences';
-import { chatWithGemini, executeCalendarAction, executeQueryTool, sendFunctionResultsToGemini } from '../../services/aiService';
+import { chatWithAI, executeCalendarAction, executeQueryTool, sendFunctionResultsToAI } from '../../services/aiService';
 import { fetchPrayerTimes, parsePrayerTime } from '../../services/prayerService';
 import ChatSidebar from './ChatSidebar';
 import ReactMarkdown from 'react-markdown';
@@ -101,20 +101,23 @@ export default function ChatView({ user, accessToken }) {
       await sendMessage('user', textToSubmit, {}, currentSessionId);
 
       const currentMessages = [...(messages || []), { role: 'user', content: textToSubmit }];
-      let geminiResponse = await chatWithGemini(currentMessages, allEvents, preferences, prayerTimes);
+      let aiResponse = await chatWithAI(currentMessages, allEvents, preferences, prayerTimes);
 
       // ── Handle function calls from the AI ───────────────────────────────
-      if (geminiResponse.isFunctionCall) {
-        const QUERY_TOOLS = ['query_events', 'get_schedule_summary', 'clear_date_range'];
+      if (aiResponse.isFunctionCall) {
+        const QUERY_TOOLS = [
+          'query_events', 'get_schedule_summary', 'clear_date_range',
+          'check_conflicts', 'find_free_slots', 'get_day_narrative',
+        ];
         const CALENDAR_TOOLS = ['add_event', 'update_event', 'delete_event'];
 
         const batchedEvents = [];
         const batchedDeletes = [];
         const batchedUpdates = [];
         const allPendingCalls = [];
-        const queryResultsForGemini = [];
+        const queryResultsForAI = [];
 
-        for (const call of geminiResponse.functionCalls) {
+        for (const call of aiResponse.functionCalls) {
           if (call.name === 'add_event') {
             const dateOnly = call.args.start ? call.args.start.split('T')[0] : null;
             batchedEvents.push({
@@ -167,22 +170,66 @@ export default function ChatView({ user, accessToken }) {
                 allPendingCalls.push({ name: 'delete_event', args: { id: ev.id } });
               });
             }
-            queryResultsForGemini.push({ name: call.name, result: queryResult });
-
+            queryResultsForAI.push({ name: call.name, result: queryResult, id: call.id });
           } else if (QUERY_TOOLS.includes(call.name)) {
-            // Execute query locally and collect for Gemini follow-up
+            // Execute query locally and collect for AI follow-up
             const queryResult = await executeQueryTool(call, allEvents);
-            queryResultsForGemini.push({ name: call.name, result: queryResult });
+            queryResultsForAI.push({ name: call.name, result: queryResult, id: call.id });
           }
         }
 
-        // If query tools were called, send results back to Gemini and get a reply
-        if (queryResultsForGemini.length > 0) {
-          const followUp = await sendFunctionResultsToGemini(
-            geminiResponse.chatInstance,
-            queryResultsForGemini
+        // If query tools were called, send results back to AI and get a reply
+        if (queryResultsForAI.length > 0) {
+          const followUp = await sendFunctionResultsToAI(
+            aiResponse.chatInstance,
+            queryResultsForAI,
+            allEvents,  // ← pass so follow-up can chain query tools
+            preferences // ← pass so we know which model to use
           );
-          if (followUp.text) {
+          // Follow-up may itself produce mutation calls (e.g. add_event after conflict check)
+          if (followUp.isFunctionCall) {
+            for (const call of followUp.functionCalls) {
+              if (call.name === 'add_event') {
+                const dateOnly = call.args.start ? call.args.start.split('T')[0] : null;
+                batchedEvents.push({
+                  ...call.args,
+                  date: dateOnly,
+                  startTime: call.args.start ? format(new Date(call.args.start), 'HH:mm') : '',
+                  endTime: call.args.end ? format(new Date(call.args.end), 'HH:mm') : '',
+                });
+                allPendingCalls.push(call);
+              } else if (call.name === 'repeat_event') {
+                const result = await executeQueryTool(call, allEvents);
+                if (result.requiresBatch && result.events?.length > 0) {
+                  result.events.forEach(ev => {
+                    batchedEvents.push({
+                      ...ev,
+                      startTime: ev.start ? format(new Date(ev.start), 'HH:mm') : '',
+                      endTime: ev.end ? format(new Date(ev.end), 'HH:mm') : '',
+                    });
+                    allPendingCalls.push({ name: 'add_event', args: ev });
+                  });
+                }
+              } else if (call.name === 'delete_event') {
+                const existingEvent = allEvents?.find(e => e.id === call.args.id);
+                batchedDeletes.push({
+                  id: call.args.id,
+                  title: existingEvent?.title || `Event #${call.args.id}`,
+                  start: existingEvent?.start,
+                  end: existingEvent?.end,
+                });
+                allPendingCalls.push(call);
+              } else if (call.name === 'update_event') {
+                const existingEvent = allEvents?.find(e => e.id === call.args.id);
+                batchedUpdates.push({
+                  id: call.args.id,
+                  title: existingEvent?.title || `Event #${call.args.id}`,
+                  updates: call.args.updates,
+                });
+                allPendingCalls.push(call);
+              }
+            }
+          } else if (followUp.text) {
             await sendMessage('assistant', followUp.text, {}, currentSessionId);
           }
         }
@@ -194,7 +241,7 @@ export default function ChatView({ user, accessToken }) {
           if (batchedDeletes.length > 0 && batchedEvents.length === 0 && batchedUpdates.length === 0) {
             defaultMessage = `I will delete ${batchedDeletes.length} event${batchedDeletes.length > 1 ? 's' : ''}. Please confirm:`;
           }
-          await sendMessage('assistant', geminiResponse.text || defaultMessage, {
+          await sendMessage('assistant', aiResponse.text || defaultMessage, {
             proposedEvents: batchedEvents,
             proposedDeletes: batchedDeletes,
             proposedUpdates: batchedUpdates,
@@ -206,15 +253,15 @@ export default function ChatView({ user, accessToken }) {
         }
 
         // Pure text response (no mutations, no follow-up queries)
-        if (!queryResultsForGemini.length && geminiResponse.text) {
-          await sendMessage('assistant', geminiResponse.text, {}, currentSessionId);
+        if (!queryResultsForAI.length && aiResponse.text) {
+          await sendMessage('assistant', aiResponse.text, {}, currentSessionId);
         }
         setLoading(false);
         return;
       }
 
-      if (geminiResponse.text) {
-        await sendMessage('assistant', geminiResponse.text, {}, currentSessionId);
+      if (aiResponse.text) {
+        await sendMessage('assistant', aiResponse.text, {}, currentSessionId);
       }
     } catch (err) {
       console.error('Chat Error:', err);

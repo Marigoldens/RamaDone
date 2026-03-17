@@ -181,6 +181,30 @@ export default function SettingsView({ user, onSignOut }) {
               </div>
             </section>
 
+            {/* ── AI MODEL ─── */}
+            <section className="settings-card">
+              <div className="settings-section-header">
+                <div className="settings-section-icon" style={{ backgroundColor: 'rgba(99, 102, 241, 0.1)', color: '#6366f1' }}>
+                  <Globe size={18} />
+                </div>
+                <div>
+                  <h2 className="settings-section-title">AI Model</h2>
+                  <p className="settings-section-subtitle">Select the DeepSeek model for the assistant</p>
+                </div>
+              </div>
+              <div className="settings-toggle-row" style={{ marginTop: '0.5rem' }}>
+                {['deepseek-reasoner', 'deepseek-chat'].map(model => (
+                  <button
+                    key={model}
+                    onClick={() => setPref('deepseekModel', model)}
+                    className={`settings-toggle-btn ${prefs.deepseekModel === model || (!prefs.deepseekModel && model === 'deepseek-reasoner') ? 'settings-toggle-btn--active' : ''}`}
+                  >
+                    {model === 'deepseek-reasoner' ? 'DeepSeek R1' : 'DeepSeek V3'}
+                  </button>
+                ))}
+              </div>
+            </section>
+
             {/* ── SYSTEM & DATA ─── */}
             <section className="settings-card">
               <div className="settings-section-header">

@@ -1,13 +1,7 @@
-import { GoogleGenAI, Type } from "@google/genai";
 import { format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { fetchPrayerTimes, parsePrayerTime } from "./prayerService";
 
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-
-let aiClient = null;
-if (apiKey) {
-  aiClient = new GoogleGenAI({ apiKey });
-}
+// No longer using Google GenAI SDK directly. DeepSeek is accessed via fetch.
 
 // ─── Temporal Context Helper ───────────────────────────────────────────────────
 function buildTemporalContext() {
@@ -37,13 +31,14 @@ This weekend     : ${fmt(addDays(weekEnd, -1))} – ${fmt(weekEnd)}
 Next week        : ${fmt(nextWeekStart)} – ${fmt(nextWeekEnd)}
 This month       : ${fmt(monthStart)} – ${fmt(monthEnd)}
 ${ramadanDay ? `Ramadan Day      : ${ramadanDay} of 30` : ""}
-Current time     : ${format(now, "HH:mm")} (24-hour)
+Current time     : ${format(now, "HH:mm")} LOCAL TIME (UTC+3)
 
 Rules:
 - "today" → ${isoDate(now)}
 - "tomorrow" → ${isoDate(tomorrow)}
 - "this weekend" → ${isoDate(addDays(weekEnd, -1))} to ${isoDate(weekEnd)}
 - "next week" → ${isoDate(nextWeekStart)} to ${isoDate(nextWeekEnd)}
+- ⚠️ ALL TIMES ARE LOCAL (UTC+3). ISO strings like 2026-03-18T09:00:00 mean 9 AM local. NEVER subtract 3 hours. NEVER convert to UTC. If user says "9 AM" → use T09:00:00. If user says "3 hours" → start + 3h in local time.
 - Always emit dates as ISO strings (YYYY-MM-DDThh:mm:ss) when calling tools.
 === END TEMPORAL REFERENCE ===`;
 }
@@ -277,9 +272,110 @@ export const executeQueryTool = async (functionCall, allEvents) => {
   return { success: false, error: "Unknown query tool" };
 };
 
+// ─── DeepSeek Chat (OpenAI-compatible API, no extra npm package) ──────────────
+const DEEPSEEK_API_KEY = import.meta.env.VITE_DEEPSEEK_API_KEY;
+const DEEPSEEK_BASE    = "https://api.deepseek.com/v1";
+
+/**
+ * Converts Google-style tool definitions → OpenAI/DeepSeek format.
+ * Also strips Google's Type enum strings to plain JSON Schema strings.
+ */
+function toOpenAITools(googleTools) {
+  const typeMap = { OBJECT: "object", STRING: "string", INTEGER: "integer", ARRAY: "array", BOOLEAN: "boolean" };
+  function convertSchema(schema) {
+    if (!schema) return {};
+    const out = {};
+    if (schema.type) out.type = typeMap[schema.type] ?? schema.type.toLowerCase();
+    if (schema.description) out.description = schema.description;
+    if (schema.properties) {
+      out.properties = {};
+      for (const [k, v] of Object.entries(schema.properties)) out.properties[k] = convertSchema(v);
+    }
+    if (schema.required) out.required = schema.required;
+    if (schema.items) out.items = convertSchema(schema.items);
+    return out;
+  }
+  return googleTools.map(t => ({
+    type: "function",
+    function: {
+      name: t.name,
+      description: t.description,
+      parameters: convertSchema(t.parameters),
+    },
+  }));
+}
+
+/**
+ * Chat with DeepSeek V3.2 (deepseek-chat, non-thinking mode).
+ * Returns same shape as chatWithGemini: { text } or { isFunctionCall, functionCalls, chatInstance }.
+ * chatInstance here is a plain object holding the full message history for follow-ups.
+ */
+async function chatWithDeepSeek(messages, systemInstruction, googleTools, model = "deepseek-reasoner") {
+  if (!DEEPSEEK_API_KEY) throw new Error("DeepSeek API key not configured");
+
+  const openAIMessages = [
+    { role: "system", content: systemInstruction },
+    ...messages.map(m => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content })),
+  ];
+
+  const body = {
+    model: model,
+    messages: openAIMessages,
+    tools: toOpenAITools(googleTools),
+    tool_choice: "auto",
+    temperature: 0.3,
+    max_tokens: 64000,
+  };
+
+  const res = await fetch(`${DEEPSEEK_BASE}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`DeepSeek API error ${res.status}: ${errText}`);
+  }
+
+  const data = await res.json();
+  const choice = data.choices?.[0];
+  if (!choice) throw new Error("DeepSeek returned no choices");
+
+  const msg = choice.message;
+
+  // Tool / function calls
+  if (msg.tool_calls?.length > 0) {
+    const functionCalls = msg.tool_calls
+      .filter(tc => tc.type === "function")
+      .map(tc => ({
+        name: tc.function.name,
+        args: JSON.parse(tc.function.arguments ?? "{}"),
+        id: tc.id,
+      }));
+
+    // Keep full history (including assistant's tool_call message) for follow-up
+    const historyForFollowUp = [
+      ...openAIMessages,
+      msg, // the assistant message with tool_calls
+    ];
+
+    return {
+      isFunctionCall: true,
+      functionCalls,
+      chatInstance: { provider: "deepseek", history: historyForFollowUp, tools: googleTools },
+    };
+  }
+
+  return { isFunctionCall: false, text: msg.content ?? "" };
+}
+
 // ─── Main Chat Function ───────────────────────────────────────────────────────
-export const chatWithGemini = async (messages, allEvents, preferences, prayerTimes = null) => {
-  if (!aiClient) throw new Error("Gemini API key is not configured.");
+export const chatWithAI = async (messages, allEvents, preferences, prayerTimes = null) => {
+  if (!DEEPSEEK_API_KEY) throw new Error("DeepSeek API key not configured");
 
   // ── Tool Declarations ──────────────────────────────────────────────────────
   const tools = [
@@ -287,13 +383,13 @@ export const chatWithGemini = async (messages, allEvents, preferences, prayerTim
       name: "add_event",
       description: "Adds a new event to the user's Ramadan schedule.",
       parameters: {
-        type: Type.OBJECT,
+        type: "OBJECT",
         properties: {
-          title: { type: Type.STRING, description: "The title of the event" },
-          start: { type: Type.STRING, description: "Start time in ISO format, e.g., '2026-03-15T15:00:00'" },
-          end:   { type: Type.STRING, description: "End time in ISO format, e.g., '2026-03-15T16:00:00'" },
-          type:  { type: Type.STRING, description: "Event type: 'prayer', 'iftar', 'suhoor', or 'custom'" },
-          color: { type: Type.STRING, description: "Optional. Color category, e.g., 'indigo', 'rose', 'emerald'" },
+          title: { type: "STRING", description: "The title of the event" },
+          start: { type: "STRING", description: "Start time in ISO format, e.g., '2026-03-15T15:00:00'" },
+          end:   { type: "STRING", description: "End time in ISO format, e.g., '2026-03-15T16:00:00'" },
+          type:  { type: "STRING", description: "Event type: 'prayer', 'iftar', 'suhoor', or 'custom'" },
+          color: { type: "STRING", description: "Optional. Color category, e.g., 'indigo', 'rose', 'emerald'" },
         },
         required: ["title", "start", "end", "type"],
       },
@@ -302,10 +398,10 @@ export const chatWithGemini = async (messages, allEvents, preferences, prayerTim
       name: "update_event",
       description: "Updates an existing event in the user's Ramadan schedule.",
       parameters: {
-        type: Type.OBJECT,
+        type: "OBJECT",
         properties: {
-          id:      { type: Type.INTEGER, description: "The ID of the event to update" },
-          updates: { type: Type.OBJECT,  description: "Fields to update (title, start, end, type, color)" },
+          id:      { type: "INTEGER", description: "The ID of the event to update" },
+          updates: { type: "OBJECT",  description: "Fields to update (title, start, end, type, color)" },
         },
         required: ["id", "updates"],
       },
@@ -314,9 +410,9 @@ export const chatWithGemini = async (messages, allEvents, preferences, prayerTim
       name: "delete_event",
       description: "Deletes a single existing event from the user's Ramadan schedule.",
       parameters: {
-        type: Type.OBJECT,
+        type: "OBJECT",
         properties: {
-          id: { type: Type.INTEGER, description: "The ID of the event to delete" },
+          id: { type: "INTEGER", description: "The ID of the event to delete" },
         },
         required: ["id"],
       },
@@ -325,12 +421,12 @@ export const chatWithGemini = async (messages, allEvents, preferences, prayerTim
       name: "query_events",
       description: "Search the calendar for events by date range, type, or keyword. Use this before updating or deleting to find event IDs, or when the user asks what's scheduled.",
       parameters: {
-        type: Type.OBJECT,
+        type: "OBJECT",
         properties: {
-          date_from: { type: Type.STRING, description: "ISO date (YYYY-MM-DD or full ISO) – start of range" },
-          date_to:   { type: Type.STRING, description: "ISO date – end of range" },
-          type:      { type: Type.STRING, description: "Filter by event type: prayer, iftar, suhoor, custom" },
-          keyword:   { type: Type.STRING, description: "Filter by keyword in event title" },
+          date_from: { type: "STRING", description: "ISO date (YYYY-MM-DD or full ISO) – start of range" },
+          date_to:   { type: "STRING", description: "ISO date – end of range" },
+          type:      { type: "STRING", description: "Filter by event type: prayer, iftar, suhoor, custom" },
+          keyword:   { type: "STRING", description: "Filter by keyword in event title" },
         },
       },
     },
@@ -338,10 +434,10 @@ export const chatWithGemini = async (messages, allEvents, preferences, prayerTim
       name: "check_conflicts",
       description: "Check if any existing events overlap a proposed time range. ALWAYS call this before adding an event unless the user explicitly says to override.",
       parameters: {
-        type: Type.OBJECT,
+        type: "OBJECT",
         properties: {
-          start: { type: Type.STRING, description: "Proposed start time in ISO format" },
-          end:   { type: Type.STRING, description: "Proposed end time in ISO format" },
+          start: { type: "STRING", description: "Proposed start time in ISO format" },
+          end:   { type: "STRING", description: "Proposed end time in ISO format" },
         },
         required: ["start", "end"],
       },
@@ -350,12 +446,12 @@ export const chatWithGemini = async (messages, allEvents, preferences, prayerTim
       name: "find_free_slots",
       description: "Find free time windows on a specific day that fit a minimum duration. Use when the user asks for a free slot, gap, or available time.",
       parameters: {
-        type: Type.OBJECT,
+        type: "OBJECT",
         properties: {
-          date:             { type: Type.STRING,  description: "Date to search (YYYY-MM-DD)" },
-          duration_minutes: { type: Type.INTEGER, description: "Minimum free block length in minutes (default 30)" },
-          earliest:         { type: Type.STRING,  description: "Start of search window, HH:MM 24h (default 06:00)" },
-          latest:           { type: Type.STRING,  description: "End of search window, HH:MM 24h (default 22:00)" },
+          date:             { type: "STRING",  description: "Date to search (YYYY-MM-DD)" },
+          duration_minutes: { type: "INTEGER", description: "Minimum free block length in minutes (default 30)" },
+          earliest:         { type: "STRING",  description: "Start of search window, HH:MM 24h (default 06:00)" },
+          latest:           { type: "STRING",  description: "End of search window, HH:MM 24h (default 22:00)" },
         },
         required: ["date"],
       },
@@ -364,9 +460,9 @@ export const chatWithGemini = async (messages, allEvents, preferences, prayerTim
       name: "get_day_narrative",
       description: "Get a structured breakdown of all events on a specific day. Use when the user asks 'what's my day looking like?' or wants a schedule overview.",
       parameters: {
-        type: Type.OBJECT,
+        type: "OBJECT",
         properties: {
-          date: { type: Type.STRING, description: "Date to describe (YYYY-MM-DD)" },
+          date: { type: "STRING", description: "Date to describe (YYYY-MM-DD)" },
         },
         required: ["date"],
       },
@@ -375,14 +471,14 @@ export const chatWithGemini = async (messages, allEvents, preferences, prayerTim
       name: "repeat_event",
       description: "Schedule the same event on multiple dates at once (recurring). Use when the user says 'every day', 'every night', 'for N days', etc. Provide all target dates.",
       parameters: {
-        type: Type.OBJECT,
+        type: "OBJECT",
         properties: {
-          title:      { type: Type.STRING, description: "Event title" },
-          start_time: { type: Type.STRING, description: "Start time HH:MM (24h), e.g. '20:30'" },
-          end_time:   { type: Type.STRING, description: "End time HH:MM (24h), e.g. '21:30'" },
-          type:       { type: Type.STRING, description: "Event type: prayer, iftar, suhoor, custom" },
-          color:      { type: Type.STRING, description: "Optional color category" },
-          dates:      { type: Type.ARRAY,  items: { type: Type.STRING }, description: "List of YYYY-MM-DD dates to add the event on" },
+          title:      { type: "STRING", description: "Event title" },
+          start_time: { type: "STRING", description: "Start time HH:MM (24h), e.g. '20:30'" },
+          end_time:   { type: "STRING", description: "End time HH:MM (24h), e.g. '21:30'" },
+          type:       { type: "STRING", description: "Event type: prayer, iftar, suhoor, custom" },
+          color:      { type: "STRING", description: "Optional color category" },
+          dates:      { type: "ARRAY",  items: { type: "STRING" }, description: "List of YYYY-MM-DD dates to add the event on" },
         },
         required: ["title", "start_time", "end_time", "dates"],
       },
@@ -391,10 +487,10 @@ export const chatWithGemini = async (messages, allEvents, preferences, prayerTim
       name: "get_schedule_summary",
       description: "Get an aggregated count of events per day/type in a date range. Use to answer 'how busy is my week?' style questions.",
       parameters: {
-        type: Type.OBJECT,
+        type: "OBJECT",
         properties: {
-          date_from: { type: Type.STRING, description: "ISO date (YYYY-MM-DD)" },
-          date_to:   { type: Type.STRING, description: "ISO date (YYYY-MM-DD)" },
+          date_from: { type: "STRING", description: "ISO date (YYYY-MM-DD)" },
+          date_to:   { type: "STRING", description: "ISO date (YYYY-MM-DD)" },
         },
       },
     },
@@ -402,11 +498,11 @@ export const chatWithGemini = async (messages, allEvents, preferences, prayerTim
       name: "clear_date_range",
       description: "Bulk-delete all events in a date range (optionally filtered by type). Shows a confirmation card to the user before executing.",
       parameters: {
-        type: Type.OBJECT,
+        type: "OBJECT",
         properties: {
-          date_from: { type: Type.STRING, description: "ISO date (YYYY-MM-DD) – start" },
-          date_to:   { type: Type.STRING, description: "ISO date (YYYY-MM-DD) – end" },
-          type:      { type: Type.STRING, description: "Optional – only delete this event type" },
+          date_from: { type: "STRING", description: "ISO date (YYYY-MM-DD) – start" },
+          date_to:   { type: "STRING", description: "ISO date (YYYY-MM-DD) – end" },
+          type:      { type: "STRING", description: "Optional – only delete this event type" },
         },
         required: ["date_from", "date_to"],
       },
@@ -429,9 +525,14 @@ Use query_events for any other date.`;
   const systemInstruction = `You are a specialized Ramadan calendar AI assistant inside the 'Ramadan Rhythm Scheduler' app.
 Your primary job is calendar management: adding, editing, finding, and organizing events with surgical precision.
 
+⚠️ TIMEZONE RULE (CRITICAL): ALL times — user input, event times, prayer times — are in the USER'S LOCAL TIME. Do NOT convert to UTC. Do NOT do timezone math. If the user says "9 AM", store it as 09:00 local. The prayer times shown are already in local time.
+
 SCHEDULING RULES:
 - Default durations: prayer = 15 min, iftar = 45 min, suhoor = 20 min, custom = 60 min.
-- Before suggesting or adding any time slot, call check_conflicts first. If conflicts exist, tell the user and suggest an alternative.
+- BATCHING (CRITICAL): If the user asks for MULTIPLE events, you MUST output ALL required 'add_event', 'update_event', or 'repeat_event' function calls simultaneously in ONE response. Do not stop after the first event. Do not do them sequentially across multiple tool call turns.
+- SKIPPING CHECKS: To save time on multi-event requests, you may optionally skip 'check_conflicts' if you are reasonably confident the requested slots are distinct, and simply invoke 'add_event' for all of them in parallel.
+- When intent is clear for a single event, call check_conflicts ONCE then immediately call add_event. Do NOT ask clarifying questions if the slot is free.
+- If a real conflict exists, offer 1–2 concise alternatives then ask the user to choose.
 - For recurring requests ("every night", "for 7 days", "rest of Ramadan"), use repeat_event with all target dates.
 - When the user asks "what's my day?", "am I free?", or "what's on?", call get_day_narrative.
 - When the user asks for a free slot, use find_free_slots.
@@ -446,60 +547,93 @@ Context: ${contextStr}
 
 Return Markdown for readability. Be concise and action-oriented.`;
 
-  // ── Chat ───────────────────────────────────────────────────────────────────
-  const chatHistory = messages.map(msg => ({
-    role: msg.role === "assistant" ? "model" : "user",
-    parts: [{ text: msg.content }],
-  }));
-
-  const FALLBACK_MODELS = ["gemini-2.5-flash"];
-  const latestMessage = messages[messages.length - 1].content;
-  let lastError = null;
-
-  for (const modelName of FALLBACK_MODELS) {
-    try {
-      console.log(`Using model: ${modelName}`);
-      const chatWithHistory = aiClient.chats.create({
-        model: modelName,
-        history: chatHistory.slice(0, -1),
-        config: {
-          systemInstruction,
-          tools: [{ functionDeclarations: tools }],
-          temperature: 0.7,
-        },
-      });
-
-      const response = await chatWithHistory.sendMessage({ message: latestMessage });
-
-      if (response.functionCalls?.length > 0) {
-        return {
-          isFunctionCall: true,
-          functionCalls: response.functionCalls.map(c => ({ name: c.name, args: c.args })),
-          chatInstance: chatWithHistory,
-        };
-      }
-
-      return { isFunctionCall: false, text: response.text };
-
-    } catch (error) {
-      console.warn(`Gemini error (${modelName}):`, error.message);
-      lastError = error;
-      continue;
-    }
-  }
-
-  throw lastError;
+  // ── DeepSeek V3.2 (Thinking Mode) ──────────────────────────────────────────────────
+  console.log("Using provider: DeepSeek V3.2 (Thinking Mode)");
+  return await chatWithDeepSeek(messages, systemInstruction, tools, preferences?.deepseekModel || 'deepseek-reasoner');
 };
 
-// ─── Send Function Results Back to Gemini ─────────────────────────────────────
-export const sendFunctionResultsToGemini = async (chatInstance, results) => {
+// ─── Send Function Results Back to DeepSeek (with multi-turn loop) ────────────
+const FOLLOW_UP_QUERY_TOOLS = [
+  'query_events', 'get_schedule_summary', 'check_conflicts',
+  'find_free_slots', 'get_day_narrative',
+];
+
+export const sendFunctionResultsToAI = async (chatInstance, results, allEvents = [], preferences = {}) => {
   try {
-    const response = await chatInstance.sendMessage({
-      message: results.map(r => ({
-        functionResponse: { name: r.name, response: r.result },
-      })),
-    });
-    return { text: response.text };
+    let history = [...chatInstance.history];
+    let pendingResults = results;
+
+    // Loop up to 8 rounds — DeepSeek may chain query tools before settling on a text or mutation response
+    for (let round = 0; round < 8; round++) {
+      // Attach tool results to history
+      const toolMessages = pendingResults.map(r => {
+        return {
+          role: "tool",
+          tool_call_id: r.id ?? r._toolCallId ?? r.name,
+          content: JSON.stringify(r.result),
+        };
+      });
+      history = [...history, ...toolMessages];
+
+      const res = await fetch(`${DEEPSEEK_BASE}/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${DEEPSEEK_API_KEY}` },
+        body: JSON.stringify({
+          model: preferences?.deepseekModel || "deepseek-reasoner",
+          messages: history,
+          tools: chatInstance.tools ? toOpenAITools(chatInstance.tools) : undefined,
+          tool_choice: "auto",
+          temperature: 0.3,
+          max_tokens: 8192,
+        }),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`DeepSeek follow-up error ${res.status}: ${errText}`);
+      }
+
+      const data = await res.json();
+      const msg = data.choices?.[0]?.message;
+      if (!msg) throw new Error("DeepSeek returned no message");
+
+      // If DeepSeek calls more tools, handle query ones locally and loop
+      if (msg.tool_calls?.length > 0) {
+        const calls = msg.tool_calls
+          .filter(tc => tc.type === "function")
+          .map(tc => ({ name: tc.function.name, args: JSON.parse(tc.function.arguments ?? "{}"), id: tc.id }));
+
+        const hasMutation = calls.some(c => !FOLLOW_UP_QUERY_TOOLS.includes(c.name));
+
+        // Mutation tools (add_event etc.) — return them for ChatView to show confirmation card
+        if (hasMutation) {
+          return {
+            text: msg.content ?? "",
+            isFunctionCall: true,
+            functionCalls: calls.map(c => ({ name: c.name, args: c.args })),
+            chatInstance: { ...chatInstance, history: [...history, msg] },
+          };
+        }
+
+        // Query tools — execute locally and loop
+        history = [...history, msg];
+        pendingResults = [];
+        for (const call of calls) {
+          if (FOLLOW_UP_QUERY_TOOLS.includes(call.name)) {
+            console.log(`Executing follow-up query tool: ${call.name}`);
+            const result = await executeQueryTool({ name: call.name, args: call.args }, allEvents);
+            pendingResults.push({ name: call.name, result, _toolCallId: call.id });
+          }
+        }
+        // Patch tool_call_ids to match properly
+        continue;
+      }
+
+      // Plain text response — done
+      return { text: msg.content ?? "" };
+    }
+
+    return { text: "I got a bit confused — please try again." };
   } catch (error) {
     console.error("Error sending function results:", error);
     throw error;

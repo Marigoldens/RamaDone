@@ -15,8 +15,7 @@ import { useEvents } from '../../hooks/useEvents';
 import { usePreferences } from '../../hooks/usePreferences';
 import { useCalendarSync } from '../../hooks/useCalendarSync';
 import { getTodayString } from '../../utils/timeHelpers';
-import { fetchPrayerTimes, parsePrayerTime } from '../../services/prayerService';
-import { toAlAdhanDate, buildISODateTime } from '../../utils/timeHelpers';
+import { usePrayerSync } from '../../hooks/usePrayerSync';
 import db from '../../db/dexie';
 import DayView   from './DayView';
 import WeekView  from './WeekView';
@@ -31,75 +30,14 @@ export default function CalendarView({ accessToken, onSignIn }) {
   const [selectedDate, setSelectedDate] = useState(getTodayString());
   const [showAddModal, setShowAddModal] = useState(false);
   const [prefilledTime, setPrefilledTime] = useState(null);
-  const [prayerLoading, setPrayerLoading] = useState(false);
   const [justSynced, setJustSynced]     = useState(false);
 
   const { addEvent } = useEvents(selectedDate);
   const { prefs, setPref } = usePreferences();
   const { syncAllEvents, syncing, error: syncError } = useCalendarSync(accessToken);
 
-  /* ── Prayer time loader ─────────────────────────── */
-  const loadPrayerTimes = useCallback(async () => {
-    setPrayerLoading(true);
-    try {
-      const [y, m, d] = selectedDate.split('-');
-      const baseDate = new Date(y, m - 1, d, 12, 0, 0); // stable midday local
-      const fetchPromises = [];
-
-      for (let i = 0; i < 7; i++) {
-        const target = addDays(baseDate, i);
-        const ds = format(target, 'yyyy-MM-dd');
-
-        fetchPromises.push(
-          (async () => {
-            const existing = await db.events
-              .where('date').equals(ds)
-              .and((e) => e.type === 'prayer' || e.type === 'iftar')
-              .count();
-
-            if (existing === 0) {
-              const timings = await fetchPrayerTimes(
-                prefs.latitude, prefs.longitude, toAlAdhanDate(ds)
-              );
-              const prayers = [
-                { name: 'Fajr',            type: 'prayer', dur: 30, t: timings.Fajr    },
-                { name: 'Dhuhr',           type: 'prayer', dur: 20, t: timings.Dhuhr   },
-                { name: 'Asr',             type: 'prayer', dur: 20, t: timings.Asr     },
-                { name: 'Maghrib (Iftar)', type: 'iftar',  dur: 60, t: timings.Maghrib },
-                { name: 'Isha',            type: 'prayer', dur: 30, t: timings.Isha    },
-              ];
-              
-              const dayBatch = [];
-              for (const p of prayers) {
-                const { hours, minutes } = parsePrayerTime(p.t);
-                const start = buildISODateTime(ds, hours, minutes);
-                const end   = new Date(start);
-                end.setMinutes(end.getMinutes() + p.dur);
-                dayBatch.push({
-                  title: p.name, start, end: end.toISOString(),
-                  type: p.type, date: ds,
-                  googleId: null, synced: 0, updatedAt: Date.now(), deleted: 0,
-                });
-              }
-              return dayBatch;
-            }
-            return [];
-          })()
-        );
-      }
-      
-      const results = await Promise.all(fetchPromises);
-      const batch = results.flat();
-      
-      if (batch.length > 0) await db.events.bulkAdd(batch);
-    } catch (err) {
-      console.error('[CalendarView] Prayer time load failed:', err);
-    } finally {
-      setPrayerLoading(false);
-    }
-  }, [selectedDate, prefs.latitude, prefs.longitude]);
-
-  useEffect(() => { loadPrayerTimes(); }, [loadPrayerTimes]);
+  /* ── Prayer time sync (background) ─────────── */
+  const { syncing: prayerLoading } = usePrayerSync(selectedDate);
 
   /* ── Navigation (offsets by current view granularity) ── */
   const navigate = (dir) => {

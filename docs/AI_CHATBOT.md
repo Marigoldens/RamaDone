@@ -6,7 +6,7 @@
 
 ## What Is the AI Chatbot?
 
-The chat screen in RamaDone is powered by **Google Gemini** (`gemini-2.5-flash`). It is not a generic chatbot — it is a **specialized Ramadan calendar brain** that can read your schedule, detect conflicts, add events, delete events, and understand verbal time expressions like "tomorrow night" or "this weekend".
+The chat screen in RamaDone is powered by **DeepSeek V3.2**. It is not a generic chatbot — it is a **specialized Ramadan calendar brain** that can read your schedule, detect conflicts, add events, delete events, and understand verbal time expressions like "tomorrow night" or "this weekend".
 
 Everything the AI does goes through your **local device** first (IndexedDB via Dexie). Nothing is sent to a cloud calendar unless you've connected Google Calendar in settings.
 
@@ -15,14 +15,14 @@ Everything the AI does goes through your **local device** first (IndexedDB via D
 ## How a Chat Message Works (Step by Step)
 
 1. **You type a message** and hit send.
-2. The app sends your message to Gemini along with:
+2. The app sends your message to DeepSeek along with:
    - Your preferences (location, Ramadan Mode, time format)
    - Today's real prayer times (Fajr, Dhuhr, Asr, Maghrib/Iftar, Isha, Tarawih)
    - A "today + 3 days" preview of your upcoming events
    - The current date, time, day of Ramadan, and time-reference rules (so "next week" always resolves to the correct dates)
-3. **Gemini responds** — either with plain text, or by calling one of 10 built-in tools.
-4. If Gemini calls a **mutation tool** (add, update, delete), you see a **confirmation card** — you must approve before anything changes.
-5. If Gemini calls a **query tool** (search, free slots, day summary), it runs locally on your device and the result is fed back to Gemini, which then writes you a natural reply.
+3. **DeepSeek responds** — either with plain text, or by calling one of 10 built-in tools.
+4. If DeepSeek calls a **mutation tool** (add, update, delete), you see a **confirmation card** — you must approve before anything changes.
+5. If DeepSeek calls a **query tool** (search, free slots, day summary), it runs locally on your device and the result is fed back to DeepSeek, which then writes you a natural reply.
 
 ---
 
@@ -52,7 +52,7 @@ Everything the AI does goes through your **local device** first (IndexedDB via D
 
 ## The Confirmation Card
 
-Whenever Gemini wants to **add, update, or delete** events, it pauses and shows you a card instead of acting immediately. The card shows:
+Whenever DeepSeek wants to **add, update, or delete** events, it pauses and shows you a card instead of acting immediately. The card shows:
 
 - 🟢 **Green cards** — events to be added (with title, date, time, type)
 - 🔴 **Red cards** — events to be deleted (with title and time)
@@ -145,7 +145,7 @@ No. All mutations (add/update/delete) go through the confirmation card. The AI c
 For today + 3 days, it receives them directly. For any other date, it calls `query_events` to search — it never has your entire calendar in memory at once.
 
 **Q: What if I'm offline?**
-The calendar app works fully offline. The AI chat requires an internet connection (for Gemini API) but prayer times load from cache if already fetched.
+The calendar app works fully offline. The AI chat requires an internet connection (for DeepSeek API) but prayer times load from cache if already fetched.
 
 **Q: Why does the AI ask for confirmation instead of just adding the event?**
 By design — the AI is confident about the data but you should always be in control of your own calendar. The card also lets you review the exact time before committing.

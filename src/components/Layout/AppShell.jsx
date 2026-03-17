@@ -3,6 +3,7 @@ import BottomNav from './BottomNav';
 import CalendarView from '../Calendar/CalendarView';
 import ChatView from '../Chat/ChatView';
 import SettingsView from '../Settings/SettingsView';
+import PrayersView from '../Prayers/PrayersView';
 
 /**
  * Authenticated app shell with persistent navigation.
@@ -32,6 +33,9 @@ export default function AppShell({ user, accessToken, onSignIn, onSignOut }) {
         )}
         {activeTab === 'calendar' && (
           <CalendarView accessToken={accessToken} onSignIn={onSignIn} />
+        )}
+        {activeTab === 'prayers' && (
+          <PrayersView />
         )}
       </main>
     </div>

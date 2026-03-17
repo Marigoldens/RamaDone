@@ -1,4 +1,4 @@
-# RamaDone — AI Workspace Context (GEMINI.md)
+# RamaDone — AI Workspace Context (AI_CONTEXT.md)
 
 > This file is read automatically by AI assistants working in this workspace.
 > It describes the full architecture, conventions, and key files of the project.
@@ -9,12 +9,12 @@
 
 **RamaDone** is an offline-first Ramadan Rhythm Scheduler — a React PWA where users manage
 their daily Ramadan schedule (prayers, Iftar, Suhoor, custom events) with the help of a
-specialized AI chatbot powered by Gemini.
+specialized AI chatbot (DeepSeek or Gemini).
 
 **Stack:**
 - React 18 + Vite (frontend)
 - Dexie (IndexedDB — offline-first local DB)
-- Google Gemini API (`gemini-2.5-flash`) via `@google/genai`
+- Gemini & DeepSeek APIs (user configurable)
 - AlAdhan REST API (free, no key — prayer times)
 - Google Calendar API (optional sync via OAuth)
 - CSS custom properties + theme system (no Tailwind)
@@ -81,10 +81,10 @@ preferences  : key (primary)
 
 | Export | Description |
 |---|---|
-| `chatWithGemini(messages, allEvents, preferences, prayerTimes)` | Main chat function — returns `{ isFunctionCall, functionCalls, chatInstance }` or `{ text }` |
+| `chatWithAI(messages, allEvents, preferences, prayerTimes)` | Main chat function — returns `{ isFunctionCall, functionCalls, chatInstance }` or `{ text }` |
 | `executeCalendarAction(functionCall, eventsHook)` | Executes confirmed mutations (add/update/delete) against Dexie |
 | `executeQueryTool(functionCall, allEvents)` | Executes read-only + utility tools locally, returns data |
-| `sendFunctionResultsToGemini(chatInstance, results)` | Sends tool results back to Gemini for a follow-up reply |
+| `sendFunctionResultsToAI(chatInstance, results)` | Sends tool results back to AI for a follow-up reply |
 
 ### Tool Categories
 
@@ -94,7 +94,7 @@ preferences  : key (primary)
 - `delete_event` — delete a single event by ID
 - `clear_date_range` — bulk-delete all events in a date range
 
-**Query/Utility tools** (executed locally, results sent back to Gemini):
+**Query/Utility tools** (executed locally, results sent back to AI):
 - `query_events` — search by date range / type / keyword
 - `get_schedule_summary` — event counts per day/type in a range
 - `check_conflicts` — detect overlapping events for a proposed time
@@ -116,7 +116,7 @@ preferences  : key (primary)
 ```
 User types message
       ↓
-chatWithGemini() → Gemini responds
+chatWithAI() → AI responds (DeepSeek/Gemini)
       ↓
   isFunctionCall?
   ├── NO  → save text message to DB → display
@@ -126,10 +126,10 @@ chatWithGemini() → Gemini responds
         ├── delete_event    → push to batchedDeletes + allPendingCalls
         ├── update_event    → push to batchedUpdates + allPendingCalls
         ├── clear_date_range→ executeQueryTool → push found events to batchedDeletes
-        └── query tools     → executeQueryTool → collect in queryResultsForGemini
+        └── query tools     → executeQueryTool → collect in queryResultsForAI
               ↓
-        queryResultsForGemini.length > 0?
-        └── YES → sendFunctionResultsToGemini → save follow-up text to DB
+        queryResultsForAI.length > 0?
+        └── YES → sendFunctionResultsToAI → save follow-up text to DB
               ↓
         hasPendingActions (mutations)?
         └── YES → save assistant message with { proposedEvents, proposedDeletes, proposedUpdates, rawCalls, isConfirmed: false }
@@ -142,7 +142,7 @@ On `ChatView` mount (and when `preferences.latitude` changes):
 - Calls `fetchPrayerTimes(lat, lon, date, method)` from AlAdhan
 - Builds a one-line prayer-times block string
 - Stores in `prayerTimes` state
-- Passed into every `chatWithGemini()` call as the 4th argument
+- Passed into every `chatWithAI()` call as the 4th argument
 - Fails gracefully (console.warn, no UI impact)
 
 ---
@@ -154,7 +154,7 @@ On `ChatView` mount (and when `preferences.latitude` changes):
 - **Dexie live queries** via `useLiveQuery` for all reactive data
 - **Soft deletes** for Google-synced events (`deleted: 1`)
 - Event `start`/`end` always ISO strings; `date` is `YYYY-MM-DD` (separate field for Dexie indexing)
-- AI tools are declared as plain objects (not class instances) inside `chatWithGemini`
+- AI tools are declared as plain objects (not class instances) inside `chatWithAI`
 - `buildTemporalContext()` and `buildPrayerContext()` run fresh on every chat call
 
 ---
@@ -162,7 +162,7 @@ On `ChatView` mount (and when `preferences.latitude` changes):
 ## Environment Variables (`.env.local`)
 
 ```
-VITE_GEMINI_API_KEY=...          # Required — Google Gemini API key
+VITE_DEEPSEEK_API_KEY=...        # Required — DeepSeek API key
 VITE_GOOGLE_CLIENT_ID=...        # Optional — Google OAuth for calendar sync
 ```
 

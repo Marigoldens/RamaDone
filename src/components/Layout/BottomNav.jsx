@@ -1,12 +1,13 @@
-import { Settings, MessageCircle, Calendar } from 'lucide-react';
+import { Settings, MessageCircle, Calendar, Clock } from 'lucide-react';
 import { Moon } from 'lucide-react';
 
-/** @typedef {'settings' | 'chat' | 'calendar'} TabId */
+/** @typedef {'settings' | 'chat' | 'calendar' | 'prayers'} TabId */
 
 const TABS = [
   { id: 'settings', label: 'Settings', icon: Settings },
   { id: 'chat',     label: 'Chat',     icon: MessageCircle },
   { id: 'calendar', label: 'Calendar', icon: Calendar },
+  { id: 'prayers',  label: 'Prayers',  icon: Clock },
 ];
 
 /**
