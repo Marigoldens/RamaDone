@@ -1,6 +1,6 @@
 .inchat-event-card {
-  background-color: var(--surface);
-  border: 1px solid var(--border);
+  background-color: var(--c-surface-elevated);
+  border: 1px solid var(--c-border);
   border-radius: 12px;
   overflow: hidden;
   margin-top: 0.5rem;
@@ -10,7 +10,7 @@
 }
 
 .inchat-event-card.confirmed {
-  border-color: var(--primary);
+  border-color: var(--c-primary);
   opacity: 0.9;
 }
 
@@ -19,17 +19,17 @@
   align-items: center;
   gap: 0.5rem;
   padding: 1rem;
-  background-color: var(--bg);
-  border-bottom: 1px solid var(--border);
+  background-color: var(--c-surface);
+  border-bottom: 1px solid var(--c-border);
 }
 
 .inchat-event-icon {
-  color: var(--primary);
+  color: var(--c-primary);
 }
 
 .inchat-event-title {
   font-weight: 600;
-  color: var(--text);
+  color: var(--c-text);
   font-size: 0.9rem;
 }
 
@@ -42,7 +42,7 @@
 
 .inchat-event-item {
   padding: 1rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--c-border);
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -55,13 +55,13 @@
 .inchat-event-item-main strong {
   display: block;
   font-size: 0.95rem;
-  color: var(--text);
+  color: var(--c-text);
   margin-bottom: 0.25rem;
 }
 
 .inchat-event-desc {
   font-size: 0.85rem;
-  color: var(--text-muted);
+  color: var(--c-text-muted);
   margin: 0;
   line-height: 1.4;
 }
@@ -71,8 +71,8 @@
   align-items: center;
   gap: 0.35rem;
   font-size: 0.8rem;
-  color: var(--primary);
-  background-color: rgba(var(--primary-rgb), 0.1);
+  color: var(--c-primary);
+  background-color: color-mix(in srgb, var(--c-primary) 10%, transparent);
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
   align-self: flex-start;
@@ -81,7 +81,7 @@
 .inchat-event-btn {
   width: 100%;
   padding: 1rem;
-  background-color: var(--primary);
+  background-color: var(--c-primary);
   color: #ffffff;
   border: none;
   font-weight: 600;
@@ -91,7 +91,7 @@
 }
 
 .inchat-event-btn:hover {
-  background-color: var(--primary-dark, #0d9488);
+  background-color: var(--c-primary-light);
 }
 
 .inchat-event-confirmed {
@@ -100,8 +100,8 @@
   justify-content: center;
   gap: 0.5rem;
   padding: 1rem;
-  background-color: rgba(16, 185, 129, 0.1); /* Emerald 500 at 10% */
-  color: #10b981; /* Emerald 500 */
+  background-color: rgba(16, 185, 129, 0.1);
+  color: #10b981;
   font-weight: 600;
   font-size: 0.95rem;
 }
@@ -165,7 +165,7 @@
   gap: 0.25rem;
   font-size: 0.78rem;
   background-color: rgba(245, 158, 11, 0.1);
-  color: var(--text);
+  color: var(--c-text);
   padding: 0.2rem 0.5rem;
   border-radius: 4px;
   border: 1px solid rgba(245, 158, 11, 0.25);

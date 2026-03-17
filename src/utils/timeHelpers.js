@@ -107,15 +107,19 @@ export function toAlAdhanDate(isoDate) {
 }
 
 /**
- * Build an ISO datetime string from a date string and time.
+ * Build a local ISO datetime string from a date string and time.
+ *
+ * IMPORTANT: We intentionally avoid .toISOString() here because that
+ * converts to UTC, which shifts times by the user's timezone offset.
+ * All times in this app are in the user's local time.
  *
  * @param {string} date — YYYY-MM-DD
  * @param {number} hours
  * @param {number} minutes
- * @returns {string} ISO datetime string
+ * @returns {string} Local ISO datetime string like "2026-03-01T14:30:00"
  */
 export function buildISODateTime(date, hours, minutes) {
-  const d = new Date(`${date}T00:00:00`);
-  d.setHours(hours, minutes, 0, 0);
-  return d.toISOString();
+  const hh = String(hours).padStart(2, '0');
+  const mm = String(minutes).padStart(2, '0');
+  return `${date}T${hh}:${mm}:00`;
 }

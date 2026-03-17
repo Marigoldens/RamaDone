@@ -302,7 +302,7 @@ export default function ChatView({ user, accessToken }) {
             </div>
             <div>
               <h1 className="chat-header-title">Ramadan AI</h1>
-              <p className="chat-header-subtitle">Powered by Gemini</p>
+              <p className="chat-header-subtitle">Powered by DeepSeek</p>
             </div>
           </div>
           {/* Status pill */}

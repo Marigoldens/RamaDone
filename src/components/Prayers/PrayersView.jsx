@@ -1,51 +1,56 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
-import { MapPin, Settings as SettingsIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
 import db from '../../db/dexie';
 import { usePreferences } from '../../hooks/usePreferences';
 import { usePrayerSync } from '../../hooks/usePrayerSync';
-import { getTodayString } from '../../utils/timeHelpers';
 
 export default function PrayersView() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const { prefs } = usePreferences();
   const tableContainerRef = useRef(null);
-  
-  // Use day string for the hook to trigger syncs if needed
+
+  // Trigger prayer sync for the selected month
   const monthStartStr = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
   const { loading } = usePrayerSync(monthStartStr);
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
 
-  // Get all prayer events for the visible month
-  const events = useLiveQuery(
-    () => db.events
+  // Query the dedicated prayerTimes table (NOT the events table)
+  const prayerRows = useLiveQuery(
+    () => db.prayerTimes
       .where('date')
       .between(format(monthStart, 'yyyy-MM-dd'), format(monthEnd, 'yyyy-MM-dd'), true, true)
-      .and(e => e.type === 'prayer' || e.type === 'iftar')
       .toArray(),
     [currentMonth]
   );
+
+  // Build a Map for fast lookup: date → prayer times object
+  const prayerMap = useMemo(() => {
+    const map = new Map();
+    (prayerRows || []).forEach(r => map.set(r.date, r));
+    return map;
+  }, [prayerRows]);
 
   const days = useMemo(() => {
     const interval = eachDayOfInterval({ start: monthStart, end: monthEnd });
     return interval.map(date => {
       const dateStr = format(date, 'yyyy-MM-dd');
-      const dayEvents = (events || []).filter(e => e.date === dateStr);
-      
+      const prayers = prayerMap.get(dateStr);
+
       return {
         date,
         isToday: isSameDay(date, new Date()),
-        fajr: dayEvents.find(e => e.title.includes('Fajr'))?.start,
-        dhuhr: dayEvents.find(e => e.title.includes('Dhuhr'))?.start,
-        asr: dayEvents.find(e => e.title.includes('Asr'))?.start,
-        maghrib: dayEvents.find(e => e.title.includes('Maghrib'))?.start,
-        isha: dayEvents.find(e => e.title.includes('Isha'))?.start,
+        fajr:    prayers?.fajr    || null,
+        dhuhr:   prayers?.dhuhr   || null,
+        asr:     prayers?.asr     || null,
+        maghrib: prayers?.maghrib || null,
+        isha:    prayers?.isha    || null,
       };
     });
-  }, [events, monthStart, monthEnd]);
+  }, [prayerMap, monthStart, monthEnd]);
 
   useEffect(() => {
     // Scroll to today's row if it exists
@@ -60,10 +65,20 @@ export default function PrayersView() {
     return () => clearTimeout(timer);
   }, [currentMonth, days]);
 
-  const formatTime = (isoStr) => {
-    if (!isoStr) return '--:--';
-    const date = new Date(isoStr);
-    return format(date, prefs.timeFormat === '24h' ? 'HH:mm' : 'h:mm a');
+  /**
+   * Format a prayer time string (e.g. "04:32") for display.
+   * Respects the user's 12h/24h preference.
+   */
+  const formatTime = (timeStr) => {
+    if (!timeStr) return '--:--';
+
+    if (prefs.timeFormat === '24h') return timeStr;
+
+    // Convert "HH:MM" to 12h format
+    const [h, m] = timeStr.split(':').map(Number);
+    const period = h >= 12 ? 'PM' : 'AM';
+    const displayH = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    return `${displayH}:${String(m).padStart(2, '0')} ${period}`;
   };
 
   const navigateMonth = (offset) => {
@@ -72,6 +87,10 @@ export default function PrayersView() {
     setCurrentMonth(next);
   };
 
+  // Safe lat/lon display (avoid crash if undefined)
+  const latDisplay = prefs.latitude != null ? Number(prefs.latitude).toFixed(2) : '—';
+  const lonDisplay = prefs.longitude != null ? Number(prefs.longitude).toFixed(2) : '—';
+
   return (
     <div className="prayers-root">
       <header className="prayers-header">
@@ -79,7 +98,7 @@ export default function PrayersView() {
           <h1 className="prayers-title">{format(currentMonth, 'MMMM yyyy')}</h1>
           <div className="prayers-location-pill">
             <MapPin className="w-3.5 h-3.5" />
-            <span>{prefs.latitude.toFixed(2)}, {prefs.longitude.toFixed(2)}</span>
+            <span>{latDisplay}, {lonDisplay}</span>
           </div>
         </div>
 

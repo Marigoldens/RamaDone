@@ -15,7 +15,6 @@ import { useEvents } from '../../hooks/useEvents';
 import { usePreferences } from '../../hooks/usePreferences';
 import { useCalendarSync } from '../../hooks/useCalendarSync';
 import { getTodayString } from '../../utils/timeHelpers';
-import { usePrayerSync } from '../../hooks/usePrayerSync';
 import db from '../../db/dexie';
 import DayView   from './DayView';
 import WeekView  from './WeekView';
@@ -36,8 +35,6 @@ export default function CalendarView({ accessToken, onSignIn }) {
   const { prefs, setPref } = usePreferences();
   const { syncAllEvents, syncing, error: syncError } = useCalendarSync(accessToken);
 
-  /* ── Prayer time sync (background) ─────────── */
-  const { syncing: prayerLoading } = usePrayerSync(selectedDate);
 
   /* ── Navigation (offsets by current view granularity) ── */
   const navigate = (dir) => {
@@ -152,8 +149,6 @@ export default function CalendarView({ accessToken, onSignIn }) {
         </div>
       </header>
 
-      {/* Prayer loading bar */}
-      {prayerLoading && <div className="cal-loading-bar" />}
       {syncError && <p className="cal-sync-error">{syncError}</p>}
 
       {/* ─── View Content ──────────────────────── */}

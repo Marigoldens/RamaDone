@@ -274,7 +274,7 @@ export const executeQueryTool = async (functionCall, allEvents) => {
 
 // ─── DeepSeek Chat (OpenAI-compatible API, no extra npm package) ──────────────
 const DEEPSEEK_API_KEY = import.meta.env.VITE_DEEPSEEK_API_KEY;
-const DEEPSEEK_BASE    = "https://api.deepseek.com/v1";
+const DEEPSEEK_BASE    = "https://api.deepseek.com";
 
 /**
  * Converts Google-style tool definitions → OpenAI/DeepSeek format.
@@ -306,12 +306,17 @@ function toOpenAITools(googleTools) {
 }
 
 /**
- * Chat with DeepSeek V3.2 (deepseek-chat, non-thinking mode).
- * Returns same shape as chatWithGemini: { text } or { isFunctionCall, functionCalls, chatInstance }.
- * chatInstance here is a plain object holding the full message history for follow-ups.
+ * Chat with DeepSeek (OpenAI-compatible).
+ * - deepseek-chat: fast, efficient, great for tool calling (default)
+ * - deepseek-reasoner: slower, deeper reasoning, uses thinking tokens
+ *
+ * Returns: { text } or { isFunctionCall, functionCalls, chatInstance }.
+ * chatInstance is a plain object holding the full message history for follow-ups.
  */
-async function chatWithDeepSeek(messages, systemInstruction, googleTools, model = "deepseek-reasoner") {
+async function chatWithDeepSeek(messages, systemInstruction, googleTools, model = "deepseek-chat") {
   if (!DEEPSEEK_API_KEY) throw new Error("DeepSeek API key not configured");
+
+  const isThinkingMode = model === "deepseek-reasoner";
 
   const openAIMessages = [
     { role: "system", content: systemInstruction },
@@ -323,8 +328,8 @@ async function chatWithDeepSeek(messages, systemInstruction, googleTools, model 
     messages: openAIMessages,
     tools: toOpenAITools(googleTools),
     tool_choice: "auto",
-    temperature: 0.3,
-    max_tokens: 64000,
+    temperature: isThinkingMode ? 1.0 : 0.7,
+    max_tokens: isThinkingMode ? 16384 : 8192,
   };
 
   const res = await fetch(`${DEEPSEEK_BASE}/chat/completions`, {
@@ -338,6 +343,9 @@ async function chatWithDeepSeek(messages, systemInstruction, googleTools, model 
 
   if (!res.ok) {
     const errText = await res.text();
+    if (res.status === 402) throw new Error("DeepSeek API: Insufficient balance. Please top up your DeepSeek account.");
+    if (res.status === 429) throw new Error("DeepSeek API: Rate limited. Please wait a moment and try again.");
+    if (res.status === 503) throw new Error("DeepSeek API: Service temporarily overloaded. Please try again shortly.");
     throw new Error(`DeepSeek API error ${res.status}: ${errText}`);
   }
 
@@ -522,15 +530,21 @@ Upcoming events (today + 3 days): ${JSON.stringify(previewEvents)}.
 Use query_events for any other date.`;
 
   // ── System Prompt ──────────────────────────────────────────────────────────
-  const systemInstruction = `You are a specialized Ramadan calendar AI assistant inside the 'Ramadan Rhythm Scheduler' app.
+  const selectedModel = preferences?.deepseekModel || 'deepseek-chat';
+
+  const systemInstruction = `You are **Ramadan AI** — a warm, knowledgeable assistant inside the 'RamaDone' Ramadan Rhythm Scheduler app.
+You help Muslims plan their blessed Ramadan days by managing prayers, Iftar, Suhoor, Quran sessions, and custom events.
+
+Your personality: You are encouraging, concise, and spiritually mindful. Use Islamic greetings naturally (e.g. "In shaa Allah", "Masha'Allah"). Keep answers short and action-oriented.
+
 Your primary job is calendar management: adding, editing, finding, and organizing events with surgical precision.
 
 ⚠️ TIMEZONE RULE (CRITICAL): ALL times — user input, event times, prayer times — are in the USER'S LOCAL TIME. Do NOT convert to UTC. Do NOT do timezone math. If the user says "9 AM", store it as 09:00 local. The prayer times shown are already in local time.
 
 SCHEDULING RULES:
 - Default durations: prayer = 15 min, iftar = 45 min, suhoor = 20 min, custom = 60 min.
-- BATCHING (CRITICAL): If the user asks for MULTIPLE events, you MUST output ALL required 'add_event', 'update_event', or 'repeat_event' function calls simultaneously in ONE response. Do not stop after the first event. Do not do them sequentially across multiple tool call turns.
-- SKIPPING CHECKS: To save time on multi-event requests, you may optionally skip 'check_conflicts' if you are reasonably confident the requested slots are distinct, and simply invoke 'add_event' for all of them in parallel.
+- BATCHING (CRITICAL): If the user asks for MULTIPLE events, output ALL required function calls simultaneously in ONE response. Do not stop after the first event.
+- SKIPPING CHECKS: To save time on multi-event requests, you may skip 'check_conflicts' if slots are obviously distinct.
 - When intent is clear for a single event, call check_conflicts ONCE then immediately call add_event. Do NOT ask clarifying questions if the slot is free.
 - If a real conflict exists, offer 1–2 concise alternatives then ask the user to choose.
 - For recurring requests ("every night", "for 7 days", "rest of Ramadan"), use repeat_event with all target dates.
@@ -547,9 +561,9 @@ Context: ${contextStr}
 
 Return Markdown for readability. Be concise and action-oriented.`;
 
-  // ── DeepSeek V3.2 (Thinking Mode) ──────────────────────────────────────────────────
-  console.log("Using provider: DeepSeek V3.2 (Thinking Mode)");
-  return await chatWithDeepSeek(messages, systemInstruction, tools, preferences?.deepseekModel || 'deepseek-reasoner');
+  // ── DeepSeek API call ──────────────────────────────────────────────────
+  console.log(`Using provider: DeepSeek (${selectedModel === 'deepseek-reasoner' ? 'Thinking Mode' : 'Standard Mode'})`);
+  return await chatWithDeepSeek(messages, systemInstruction, tools, selectedModel);
 };
 
 // ─── Send Function Results Back to DeepSeek (with multi-turn loop) ────────────
@@ -575,16 +589,18 @@ export const sendFunctionResultsToAI = async (chatInstance, results, allEvents =
       });
       history = [...history, ...toolMessages];
 
+      const followUpModel = preferences?.deepseekModel || "deepseek-chat";
+      const isThinking = followUpModel === "deepseek-reasoner";
       const res = await fetch(`${DEEPSEEK_BASE}/chat/completions`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${DEEPSEEK_API_KEY}` },
         body: JSON.stringify({
-          model: preferences?.deepseekModel || "deepseek-reasoner",
+          model: followUpModel,
           messages: history,
           tools: chatInstance.tools ? toOpenAITools(chatInstance.tools) : undefined,
           tool_choice: "auto",
-          temperature: 0.3,
-          max_tokens: 8192,
+          temperature: isThinking ? 1.0 : 0.7,
+          max_tokens: isThinking ? 16384 : 8192,
         }),
       });
 

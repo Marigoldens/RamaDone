@@ -20,46 +20,33 @@ import Dexie from 'dexie';
 export const db = new Dexie('RamadanDB');
 
 db.version(3).stores({
-  /**
-   * Chat sessions store.
-   * - id: auto-incremented primary key
-   * - title: dynamically generated short title
-   * - updatedAt: Unix timestamp for ordering
-   */
   chatSessions: '++id, title, updatedAt',
-
-  /**
-   * Chat messages store.
-   * - id: auto-incremented primary key
-   * - sessionId: relation to chatSessions.id
-   * - role: 'user' | 'assistant' | 'system'
-   * - timestamp: Unix timestamp for ordering
-   */
   messages: '++id, sessionId, role, timestamp',
-
-  /**
-   * Calendar events store.
-   * - id: auto-incremented primary key
-   * - googleId: Google Calendar event ID (for sync deduplication)
-   * - title: event name
-   * - start: ISO datetime string
-   * - end: ISO datetime string
-   * - type: 'prayer' | 'iftar' | 'suhoor' | 'custom'
-   * - date: YYYY-MM-DD for fast per-day queries
-   * - synced: boolean (0/1) for delta sync
-   * - updatedAt: timestamp for conflict/sync tracking
-   * - deleted: boolean (0/1) for syncable deletions
-   */
   events: '++id, googleId, title, start, end, type, date, synced, updatedAt, deleted',
-
-  /**
-   * Preferences key-value store.
-   * - key: unique preference identifier (primary key)
-   * - value: the preference value
-   *
-   * Using 'key' as the primary key (no ++) means we use put() to upsert.
-   */
   preferences: 'key',
+});
+
+/**
+ * Version 4: Add dedicated prayerTimes table.
+ *
+ * WHY?  Previously prayer times were stored as fake events in the events
+ * table, polluting the calendar and requiring fragile title-based matching
+ * (e.g. e.title.includes('Fajr')).  The new table stores raw prayer times
+ * per date with proper fields (fajr, dhuhr, asr, maghrib, isha).
+ *
+ * The upgrade function cleans old prayer/iftar events from the events table.
+ */
+db.version(4).stores({
+  chatSessions: '++id, title, updatedAt',
+  messages: '++id, sessionId, role, timestamp',
+  events: '++id, googleId, title, start, end, type, date, synced, updatedAt, deleted',
+  preferences: 'key',
+  prayerTimes: 'date',   // primary key = date (YYYY-MM-DD), one row per day
+}).upgrade(tx => {
+  // Clean old prayer events from the events table
+  return tx.table('events')
+    .filter(e => e.type === 'prayer' || e.type === 'iftar')
+    .delete();
 });
 
 export default db;
