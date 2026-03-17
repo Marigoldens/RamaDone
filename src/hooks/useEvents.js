@@ -10,6 +10,22 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import db from '../db/dexie';
 
 /**
+ * Hook that returns ALL non-deleted events across every date.
+ * Used by the AI so it has full calendar visibility.
+ *
+ * @returns {Array<Object>} All events
+ */
+export function useAllEvents() {
+  return useLiveQuery(
+    () => db.events
+      .filter(event => event.deleted !== 1)
+      .sortBy('start'),
+    [],
+    []
+  );
+}
+
+/**
  * Hook that provides reactive events for a given date.
  *
  * @param {string} date — YYYY-MM-DD format

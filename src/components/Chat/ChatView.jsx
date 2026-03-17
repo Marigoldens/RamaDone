@@ -3,8 +3,10 @@ import { Send, Sparkles, Bot, User, Menu, Moon } from 'lucide-react';
 import { format } from 'date-fns';
 import { useMessages, useChatSessions } from '../../hooks/useMessages';
 import { useEvents } from '../../hooks/useEvents';
+import { useAllEvents } from '../../hooks/useEvents';
 import { usePreferences } from '../../hooks/usePreferences';
-import { chatWithGemini, executeCalendarAction, sendFunctionResultsToGemini } from '../../services/aiService';
+import { chatWithGemini, executeCalendarAction, executeQueryTool, sendFunctionResultsToGemini } from '../../services/aiService';
+import { fetchPrayerTimes, parsePrayerTime } from '../../services/prayerService';
 import ChatSidebar from './ChatSidebar';
 import ReactMarkdown from 'react-markdown';
 import InChatEventCard from './InChatEventCard';
@@ -34,12 +36,45 @@ export default function ChatView({ user, accessToken }) {
   };
   const todayDate = format(new Date(), 'yyyy-MM-dd');
   const eventsHook = useEvents(todayDate);
+  const allEvents = useAllEvents();
   const { prefs: preferences } = usePreferences();
 
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [prayerTimes, setPrayerTimes] = useState(null);
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
+
+  // Fetch today's prayer times once on mount (uses user's lat/lon from preferences)
+  useEffect(() => {
+    async function loadPrayers() {
+      try {
+        const todayAlAdhan = format(new Date(), 'dd-MM-yyyy');
+        const timings = await fetchPrayerTimes(
+          preferences.latitude,
+          preferences.longitude,
+          todayAlAdhan,
+          preferences.calcMethod ?? 2
+        );
+        // Build a clean prayer times string for the AI system prompt
+        const fmt = (key) => {
+          const t = timings[key];
+          if (!t) return 'N/A';
+          const { hours, minutes } = parsePrayerTime(t);
+          return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+        };
+        const ishaTime = timings['Isha'] ? parsePrayerTime(timings['Isha']) : null;
+        const tarawihTime = ishaTime
+          ? `${String(Math.floor((ishaTime.hours * 60 + ishaTime.minutes + 30) / 60) % 24).padStart(2, '0')}:${String((ishaTime.hours * 60 + ishaTime.minutes + 30) % 60).padStart(2, '0')}`
+          : '20:30';
+        const prayerBlock = `=== TODAY'S PRAYER TIMES ===\nFajr: ${fmt('Fajr')} | Dhuhr: ${fmt('Dhuhr')} | Asr: ${fmt('Asr')} | Maghrib (Iftar): ${fmt('Maghrib')} | Isha: ${fmt('Isha')} | Tarawih: ~${tarawihTime}\nWhen user says "Iftar" → use Maghrib time. "Suhoor" → 30-60 min before Fajr.\n=== END PRAYER TIMES ===`;
+        setPrayerTimes(prayerBlock);
+      } catch (err) {
+        console.warn('Could not fetch prayer times:', err.message);
+      }
+    }
+    if (preferences.latitude) loadPrayers();
+  }, [preferences.latitude, preferences.longitude, preferences.calcMethod]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -66,41 +101,116 @@ export default function ChatView({ user, accessToken }) {
       await sendMessage('user', textToSubmit, {}, currentSessionId);
 
       const currentMessages = [...(messages || []), { role: 'user', content: textToSubmit }];
-      let geminiResponse = await chatWithGemini(currentMessages, eventsHook.events, preferences);
+      let geminiResponse = await chatWithGemini(currentMessages, allEvents, preferences, prayerTimes);
 
+      // ── Handle function calls from the AI ───────────────────────────────
       if (geminiResponse.isFunctionCall) {
+        const QUERY_TOOLS = ['query_events', 'get_schedule_summary', 'clear_date_range'];
+        const CALENDAR_TOOLS = ['add_event', 'update_event', 'delete_event'];
+
         const batchedEvents = [];
-        const functionResults = [];
+        const batchedDeletes = [];
+        const batchedUpdates = [];
+        const allPendingCalls = [];
+        const queryResultsForGemini = [];
 
         for (const call of geminiResponse.functionCalls) {
-          if (call.name === "add_event") {
+          if (call.name === 'add_event') {
             const dateOnly = call.args.start ? call.args.start.split('T')[0] : null;
             batchedEvents.push({
-               ...call.args,
-               date: dateOnly,
-               startTime: call.args.start ? format(new Date(call.args.start), 'HH:mm') : '',
-               endTime: call.args.end ? format(new Date(call.args.end), 'HH:mm') : '',
+              ...call.args,
+              date: dateOnly,
+              startTime: call.args.start ? format(new Date(call.args.start), 'HH:mm') : '',
+              endTime: call.args.end ? format(new Date(call.args.end), 'HH:mm') : '',
             });
-          } else {
-            const result = await executeCalendarAction(call, eventsHook);
-            functionResults.push({ name: call.name, result });
+            allPendingCalls.push(call);
+
+          } else if (call.name === 'repeat_event') {
+            // Execute locally — returns a batch of events to add
+            const result = await executeQueryTool(call, allEvents);
+            if (result.requiresBatch && result.events?.length > 0) {
+              result.events.forEach(ev => {
+                batchedEvents.push({
+                  ...ev,
+                  startTime: ev.start ? format(new Date(ev.start), 'HH:mm') : '',
+                  endTime: ev.end ? format(new Date(ev.end), 'HH:mm') : '',
+                });
+                allPendingCalls.push({ name: 'add_event', args: ev });
+              });
+            }
+
+          } else if (call.name === 'delete_event') {
+            const existingEvent = allEvents?.find(e => e.id === call.args.id);
+            batchedDeletes.push({
+              id: call.args.id,
+              title: existingEvent?.title || `Event #${call.args.id}`,
+              start: existingEvent?.start,
+              end: existingEvent?.end,
+            });
+            allPendingCalls.push(call);
+
+          } else if (call.name === 'update_event') {
+            const existingEvent = allEvents?.find(e => e.id === call.args.id);
+            batchedUpdates.push({
+              id: call.args.id,
+              title: existingEvent?.title || `Event #${call.args.id}`,
+              updates: call.args.updates,
+            });
+            allPendingCalls.push(call);
+
+          } else if (call.name === 'clear_date_range') {
+            // Execute locally to get which events are in range, then show confirmation
+            const queryResult = await executeQueryTool(call, allEvents);
+            if (queryResult.requiresConfirmation && queryResult.eventsToDelete?.length > 0) {
+              queryResult.eventsToDelete.forEach(ev => {
+                batchedDeletes.push(ev);
+                allPendingCalls.push({ name: 'delete_event', args: { id: ev.id } });
+              });
+            }
+            queryResultsForGemini.push({ name: call.name, result: queryResult });
+
+          } else if (QUERY_TOOLS.includes(call.name)) {
+            // Execute query locally and collect for Gemini follow-up
+            const queryResult = await executeQueryTool(call, allEvents);
+            queryResultsForGemini.push({ name: call.name, result: queryResult });
           }
         }
 
-        if (batchedEvents.length > 0) {
-          if (functionResults.length > 0) {
-            await sendFunctionResultsToGemini(geminiResponse.chatInstance, functionResults);
+        // If query tools were called, send results back to Gemini and get a reply
+        if (queryResultsForGemini.length > 0) {
+          const followUp = await sendFunctionResultsToGemini(
+            geminiResponse.chatInstance,
+            queryResultsForGemini
+          );
+          if (followUp.text) {
+            await sendMessage('assistant', followUp.text, {}, currentSessionId);
           }
-          await sendMessage('assistant', geminiResponse.text || "I have prepared the following events for your calendar. Please review and confirm:", {
+        }
+
+        // If calendar mutation calls were batched, show confirmation card
+        const hasPendingActions = batchedEvents.length > 0 || batchedDeletes.length > 0 || batchedUpdates.length > 0;
+        if (hasPendingActions) {
+          let defaultMessage = 'Please review and confirm the following changes:';
+          if (batchedDeletes.length > 0 && batchedEvents.length === 0 && batchedUpdates.length === 0) {
+            defaultMessage = `I will delete ${batchedDeletes.length} event${batchedDeletes.length > 1 ? 's' : ''}. Please confirm:`;
+          }
+          await sendMessage('assistant', geminiResponse.text || defaultMessage, {
             proposedEvents: batchedEvents,
-            rawCalls: geminiResponse.functionCalls.filter(c => c.name === "add_event"),
-            isConfirmed: false
+            proposedDeletes: batchedDeletes,
+            proposedUpdates: batchedUpdates,
+            rawCalls: allPendingCalls,
+            isConfirmed: false,
           }, currentSessionId);
           setLoading(false);
           return;
-        } else if (functionResults.length > 0) {
-          geminiResponse = await sendFunctionResultsToGemini(geminiResponse.chatInstance, functionResults);
         }
+
+        // Pure text response (no mutations, no follow-up queries)
+        if (!queryResultsForGemini.length && geminiResponse.text) {
+          await sendMessage('assistant', geminiResponse.text, {}, currentSessionId);
+        }
+        setLoading(false);
+        return;
       }
 
       if (geminiResponse.text) {
@@ -202,9 +312,11 @@ export default function ChatView({ user, accessToken }) {
                         </div>
                       )}
                       
-                      {msg.proposedEvents && (
+                      {(msg.proposedEvents?.length > 0 || msg.proposedDeletes?.length > 0 || msg.proposedUpdates?.length > 0) && (
                         <InChatEventCard
-                          events={msg.proposedEvents}
+                          events={msg.proposedEvents || []}
+                          deletedEvents={msg.proposedDeletes || []}
+                          updatedEvents={msg.proposedUpdates || []}
                           isConfirmed={msg.isConfirmed}
                           onConfirmAll={() => handleConfirmEvents(msg.id, msg.proposedEvents, msg.rawCalls)}
                         />
