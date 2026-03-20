@@ -1,12 +1,15 @@
 /**
- * @fileoverview Calendar Month View — classic grid with event chips.
+ * @fileoverview Calendar Month View — classic grid with event chips + task pills.
  */
 import {
   startOfMonth, endOfMonth, startOfWeek, addDays,
-  format, isSameMonth, isToday, isSameDay,
+  format, isSameMonth, isToday,
 } from 'date-fns';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { useEventsRange } from '../../hooks/useEventsRange';
 import { EVENT_TYPES } from '../../utils/constants';
+import { CheckSquare } from 'lucide-react';
+import db from '../../db/dexie';
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -28,10 +31,23 @@ export default function MonthView({ date, onDayClick }) {
   const endStr   = format(addDays(gridStart, 41), 'yyyy-MM-dd');
   const events   = useEventsRange(startStr, endStr);
 
+  // Query tasks with due dates in the visible range
+  const tasksInRange = useLiveQuery(
+    () => db.tasks.where('dueDate').between(startStr, endStr, true, true).toArray(),
+    [startStr, endStr]
+  ) ?? [];
+
   const eventsByDay = {};
   (events || []).forEach((ev) => {
     if (!eventsByDay[ev.date]) eventsByDay[ev.date] = [];
     eventsByDay[ev.date].push(ev);
+  });
+
+  const tasksByDay = {};
+  tasksInRange.forEach((t) => {
+    if (!t.dueDate) return;
+    if (!tasksByDay[t.dueDate]) tasksByDay[t.dueDate] = [];
+    tasksByDay[t.dueDate].push(t);
   });
 
   return (
@@ -50,6 +66,7 @@ export default function MonthView({ date, onDayClick }) {
           const inMonth = isSameMonth(d, base);
           const today   = isToday(d);
           const dayEvs  = eventsByDay[ds] || [];
+          const dayTasks = tasksByDay[ds] || [];
 
           return (
             <button
@@ -81,6 +98,14 @@ export default function MonthView({ date, onDayClick }) {
                   <div className="cal-month-more">+{dayEvs.length - 3}</div>
                 )}
               </div>
+
+              {/* Task count pill */}
+              {dayTasks.length > 0 && (
+                <div className="cal-month-task-pill" title={`${dayTasks.length} task${dayTasks.length > 1 ? 's' : ''} due`}>
+                  <CheckSquare style={{ width: 8, height: 8 }} />
+                  {dayTasks.length}
+                </div>
+              )}
             </button>
           );
         })}

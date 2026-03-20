@@ -1,51 +1,52 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Sparkles, Bot, User, Menu, Moon } from 'lucide-react';
+import { Menu, Moon } from 'lucide-react';
 import { format } from 'date-fns';
-import { useMessages, useChatSessions } from '../../hooks/useMessages';
-import { useEvents } from '../../hooks/useEvents';
-import { useAllEvents } from '../../hooks/useEvents';
-import { usePreferences } from '../../hooks/usePreferences';
-import { chatWithAI, executeCalendarAction, executeQueryTool, sendFunctionResultsToAI } from '../../services/aiService';
-import { fetchPrayerTimes, parsePrayerTime } from '../../services/prayerService';
-import ChatSidebar from './ChatSidebar';
-import ReactMarkdown from 'react-markdown';
-import InChatEventCard from './InChatEventCard';
+import { useLiveQuery } from 'dexie-react-hooks';
 
-const SUGGESTIONS = [
-  { text: 'Plan my day around prayers', icon: '🕌' },
-  { text: 'Add a Quran study session', icon: '📖' },
-  { text: 'When is the next prayer?', icon: '🌙' },
-];
+import { useMessages, useChatSessions } from '../../hooks/useMessages';
+import { useEvents, useAllEvents } from '../../hooks/useEvents';
+import { usePreferences } from '../../hooks/usePreferences';
+import { chatWithAI, executeCalendarAction, executeQueryTool, sendFunctionResultsToAI, executeProductivityQuery } from '../../services/aiService';
+import { QUERY_TOOLS } from '../../services/aiTools';
+import { fetchPrayerTimes, parsePrayerTime } from '../../services/prayerService';
+import db from '../../db/dexie';
+
+import ChatSidebar from './ChatSidebar';
+import ChatModeBar from './ChatModeBar';
+import ChatEmptyState from './ChatEmptyState';
+import ChatMessageList from './ChatMessageList';
+import ChatInputBar from './ChatInputBar';
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function ChatView({ user, accessToken }) {
+  // ── Session state ──
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // ── Chat mode state ── ('all' → auto-detect; explicit → scoped)
+  const [chatMode, setChatMode] = useState('all');
 
   const { createSession } = useChatSessions();
   const { messages, sendMessage, updateMessageData } = useMessages(activeSessionId);
 
-  const handleConfirmEvents = async (messageId, proposedEvents, rawCalls) => {
-    try {
-      for (const call of rawCalls) {
-        await executeCalendarAction(call, eventsHook);
-      }
-      await updateMessageData(messageId, { isConfirmed: true });
-    } catch (err) {
-      console.error("Failed to confirm events", err);
-    }
-  };
   const todayDate = format(new Date(), 'yyyy-MM-dd');
-  const eventsHook = useEvents(todayDate);
-  const allEvents = useAllEvents();
+  const eventsHook  = useEvents(todayDate);
+  const allEvents   = useAllEvents();
   const { prefs: preferences } = usePreferences();
 
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [prayerTimes, setPrayerTimes] = useState(null);
-  const scrollRef = useRef(null);
-  const inputRef = useRef(null);
+  // Live productivity data for AI context and tool execution
+  const tasks     = useLiveQuery(() => db.tasks.toArray(),     [], []);
+  const expenses  = useLiveQuery(() => db.expenses.toArray(),  [], []);
+  const habits    = useLiveQuery(() => db.habits.where('archived').equals(0).toArray(), [], []);
+  const habitLogs = useLiveQuery(() => db.habitLogs.toArray(), [], []);
+  const productivityData = { tasks, expenses, habits, habitLogs };
 
-  // Fetch today's prayer times once on mount (uses user's lat/lon from preferences)
+  const ramadanMode = preferences?.ramadanMode ?? false;
+  const prayerMode  = preferences?.prayerMode  ?? true;
+
+  // ── Prayer times ──
+  const [prayerTimes, setPrayerTimes] = useState(null);
   useEffect(() => {
     async function loadPrayers() {
       try {
@@ -56,7 +57,6 @@ export default function ChatView({ user, accessToken }) {
           todayAlAdhan,
           preferences.calcMethod ?? 2
         );
-        // Build a clean prayer times string for the AI system prompt
         const fmt = (key) => {
           const t = timings[key];
           if (!t) return 'N/A';
@@ -73,8 +73,15 @@ export default function ChatView({ user, accessToken }) {
         console.warn('Could not fetch prayer times:', err.message);
       }
     }
-    if (preferences.latitude) loadPrayers();
-  }, [preferences.latitude, preferences.longitude, preferences.calcMethod]);
+    if (preferences.latitude && prayerMode) loadPrayers();
+    else setPrayerTimes(null);
+  }, [preferences.latitude, preferences.longitude, preferences.calcMethod, prayerMode]);
+
+  // ── UI state ──
+  const [input, setInput]   = useState('');
+  const [loading, setLoading] = useState(false);
+  const scrollRef = useRef(null);
+  const inputRef  = useRef(null);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -82,6 +89,56 @@ export default function ChatView({ user, accessToken }) {
     }
   }, [messages, loading]);
 
+  // ── Confirm calendar events ──
+  const handleConfirmEvents = async (messageId, proposedEvents, rawCalls) => {
+    try {
+      for (const call of rawCalls) await executeCalendarAction(call, eventsHook);
+      await updateMessageData(messageId, { isConfirmed: true });
+    } catch (err) {
+      console.error('Failed to confirm events', err);
+    }
+  };
+
+  // ── Confirm tasks / expenses / habits ──
+  const handleConfirmProductivity = async (messageId, pendingActions) => {
+    try {
+      for (const action of pendingActions) {
+        if (action.tool === 'add_task') {
+          await db.tasks.add({ ...action.args, status: action.args.status || 'todo', createdAt: Date.now(), updatedAt: Date.now() });
+        } else if (action.tool === 'update_task') {
+          await db.tasks.update(action.args.id, { ...action.args.updates, updatedAt: Date.now() });
+        } else if (action.tool === 'delete_task') {
+          await db.tasks.delete(action.args.id);
+        } else if (action.tool === 'add_expense') {
+          await db.expenses.add({ ...action.args, amount: parseFloat(action.args.amount), date: action.args.date || todayDate, createdAt: Date.now() });
+        } else if (action.tool === 'delete_expense') {
+          await db.expenses.delete(action.args.id);
+        } else if (action.tool === 'update_expense') {
+          const upd = { ...action.args.updates };
+          if (upd.amount) upd.amount = parseFloat(upd.amount);
+          await db.expenses.update(action.args.id, upd);
+        } else if (action.tool === 'add_habit') {
+          await db.habits.add({ name: action.args.name, emoji: action.args.emoji || '🎯', category: action.args.category || null, frequency: action.args.frequency || 'daily', archived: 0, createdAt: new Date().toISOString() });
+        } else if (action.tool === 'delete_habit') {
+          await db.habits.update(action.args.habitId, { archived: 1 });
+        } else if (action.tool === 'update_habit') {
+          await db.habits.update(action.args.habitId, action.args.updates);
+        } else if (action.tool === 'log_habit') {
+          const existing = await db.habitLogs.where({ habitId: action.args.habitId, date: action.args.date }).first();
+          if (existing) {
+            await db.habitLogs.update(existing.id, { completed: action.args.completed });
+          } else {
+            await db.habitLogs.add({ habitId: action.args.habitId, date: action.args.date, completed: action.args.completed, count: 1, note: '' });
+          }
+        }
+      }
+      await updateMessageData(messageId, { isConfirmed: true });
+    } catch (err) {
+      console.error('Failed to confirm productivity actions', err);
+    }
+  };
+
+  // ── Main send handler ──
   const handleSend = async (messageText = input) => {
     if (!messageText.trim() || loading) return;
 
@@ -101,68 +158,65 @@ export default function ChatView({ user, accessToken }) {
       await sendMessage('user', textToSubmit, {}, currentSessionId);
 
       const currentMessages = [...(messages || []), { role: 'user', content: textToSubmit }];
-      let aiResponse = await chatWithAI(currentMessages, allEvents, preferences, prayerTimes);
+      // Pass chatMode — aiService auto-detects domain when chatMode is 'all'
+      let aiResponse = await chatWithAI(currentMessages, allEvents, preferences, prayerTimes, productivityData, chatMode);
 
-      // ── Handle function calls from the AI ───────────────────────────────
+      // ── Handle function calls ──────────────────────────────────────────────
       if (aiResponse.isFunctionCall) {
-        const QUERY_TOOLS = [
-          'query_events', 'get_schedule_summary', 'clear_date_range',
-          'check_conflicts', 'find_free_slots', 'get_day_narrative',
-        ];
-        const CALENDAR_TOOLS = ['add_event', 'update_event', 'delete_event'];
-
-        const batchedEvents = [];
+        const batchedEvents  = [];
         const batchedDeletes = [];
         const batchedUpdates = [];
         const allPendingCalls = [];
         const queryResultsForAI = [];
+        const pendingProductivityActions = [];
+
+        // Helper to push an add_event call into the batched lists
+        const pushAddEvent = (args) => {
+          batchedEvents.push({
+            ...args,
+            date:      args.start ? args.start.split('T')[0] : null,
+            startTime: args.start ? format(new Date(args.start), 'HH:mm') : '',
+            endTime:   args.end   ? format(new Date(args.end),   'HH:mm') : '',
+          });
+          allPendingCalls.push({ name: 'add_event', args });
+        };
+
+        // Helper to build a display label for a productivity action
+        const mkProductivity = (call) => {
+          const t = tasks?.find(x => x.id === call.args.id);
+          const h = habits?.find(x => x.id === call.args.habitId);
+          switch (call.name) {
+            case 'add_task':     return { tool: call.name, args: call.args, display: `Add task: "${call.args.title}"`,                       sub: `Priority: ${call.args.priority || 'medium'}${call.args.dueDate ? ` · Due ${call.args.dueDate}` : ''}` };
+            case 'update_task':  return { tool: call.name, args: call.args, display: `Update task: "${t?.title || `#${call.args.id}`}"`,       sub: JSON.stringify(call.args.updates) };
+            case 'delete_task':  return { tool: call.name, args: call.args, display: `Delete task: "${t?.title || `#${call.args.id}`}"`,       sub: 'Cannot be undone', danger: true };
+            case 'add_expense':  return { tool: call.name, args: call.args, display: `Log ${call.args.type}: ${call.args.amount} · ${call.args.category}`, sub: call.args.note || call.args.date || todayDate };
+            case 'update_expense': return { tool: call.name, args: call.args, display: `Edit expense #${call.args.id}`,                       sub: Object.entries(call.args.updates || {}).map(([k,v]) => `${k}: ${v}`).join(', ') };
+            case 'delete_expense': return { tool: call.name, args: call.args, display: `Delete entry #${call.args.id}`,                       sub: 'Expense entry', danger: true };
+            case 'add_habit':    return { tool: call.name, args: call.args, display: `Add habit: "${call.args.name}"`,                        sub: `${call.args.emoji || '🎯'} · ${call.args.frequency || 'daily'}${call.args.category ? ` · ${call.args.category}` : ''}` };
+            case 'update_habit': return { tool: call.name, args: call.args, display: `Edit habit: "${h?.name || `Habit #${call.args.habitId}`}"`, sub: Object.entries(call.args.updates || {}).map(([k,v]) => `${k}: ${v}`).join(', ') };
+            case 'delete_habit': return { tool: call.name, args: call.args, display: `Archive habit: "${h?.name || `Habit #${call.args.habitId}`}"`, sub: 'Habit will be hidden', danger: true };
+            case 'log_habit':    return { tool: call.name, args: call.args, display: `${call.args.completed ? '✅ Mark done' : '↩️ Undo'}: "${h?.name || `Habit #${call.args.habitId}`}"`, sub: `Date: ${call.args.date}` };
+            default:             return null;
+          }
+        };
 
         for (const call of aiResponse.functionCalls) {
           if (call.name === 'add_event') {
-            const dateOnly = call.args.start ? call.args.start.split('T')[0] : null;
-            batchedEvents.push({
-              ...call.args,
-              date: dateOnly,
-              startTime: call.args.start ? format(new Date(call.args.start), 'HH:mm') : '',
-              endTime: call.args.end ? format(new Date(call.args.end), 'HH:mm') : '',
-            });
-            allPendingCalls.push(call);
-
+            pushAddEvent(call.args);
           } else if (call.name === 'repeat_event') {
-            // Execute locally — returns a batch of events to add
             const result = await executeQueryTool(call, allEvents);
             if (result.requiresBatch && result.events?.length > 0) {
-              result.events.forEach(ev => {
-                batchedEvents.push({
-                  ...ev,
-                  startTime: ev.start ? format(new Date(ev.start), 'HH:mm') : '',
-                  endTime: ev.end ? format(new Date(ev.end), 'HH:mm') : '',
-                });
-                allPendingCalls.push({ name: 'add_event', args: ev });
-              });
+              result.events.forEach(ev => pushAddEvent(ev));
             }
-
           } else if (call.name === 'delete_event') {
-            const existingEvent = allEvents?.find(e => e.id === call.args.id);
-            batchedDeletes.push({
-              id: call.args.id,
-              title: existingEvent?.title || `Event #${call.args.id}`,
-              start: existingEvent?.start,
-              end: existingEvent?.end,
-            });
+            const ev = allEvents?.find(e => e.id === call.args.id);
+            batchedDeletes.push({ id: call.args.id, title: ev?.title || `Event #${call.args.id}`, start: ev?.start, end: ev?.end });
             allPendingCalls.push(call);
-
           } else if (call.name === 'update_event') {
-            const existingEvent = allEvents?.find(e => e.id === call.args.id);
-            batchedUpdates.push({
-              id: call.args.id,
-              title: existingEvent?.title || `Event #${call.args.id}`,
-              updates: call.args.updates,
-            });
+            const ev = allEvents?.find(e => e.id === call.args.id);
+            batchedUpdates.push({ id: call.args.id, title: ev?.title || `Event #${call.args.id}`, updates: call.args.updates });
             allPendingCalls.push(call);
-
           } else if (call.name === 'clear_date_range') {
-            // Execute locally to get which events are in range, then show confirmation
             const queryResult = await executeQueryTool(call, allEvents);
             if (queryResult.requiresConfirmation && queryResult.eventsToDelete?.length > 0) {
               queryResult.eventsToDelete.forEach(ev => {
@@ -171,62 +225,44 @@ export default function ChatView({ user, accessToken }) {
               });
             }
             queryResultsForAI.push({ name: call.name, result: queryResult, id: call.id });
+          } else if (['query_tasks', 'query_expenses', 'query_habits'].includes(call.name)) {
+            const result = executeProductivityQuery(call.name, call.args, productivityData);
+            queryResultsForAI.push({ name: call.name, result, id: call.id });
           } else if (QUERY_TOOLS.includes(call.name)) {
-            // Execute query locally and collect for AI follow-up
-            const queryResult = await executeQueryTool(call, allEvents);
-            queryResultsForAI.push({ name: call.name, result: queryResult, id: call.id });
+            const result = await executeQueryTool(call, allEvents);
+            queryResultsForAI.push({ name: call.name, result, id: call.id });
+          } else {
+            const prod = mkProductivity(call);
+            if (prod) pendingProductivityActions.push(prod);
           }
         }
 
-        // If query tools were called, send results back to AI and get a reply
+        // Send query results back to AI and get a follow-up response
         if (queryResultsForAI.length > 0) {
           const followUp = await sendFunctionResultsToAI(
-            aiResponse.chatInstance,
-            queryResultsForAI,
-            allEvents,  // ← pass so follow-up can chain query tools
-            preferences // ← pass so we know which model to use
+            aiResponse.chatInstance, queryResultsForAI,
+            allEvents, preferences, productivityData, textToSubmit
           );
-          // Follow-up may itself produce mutation calls (e.g. add_event after conflict check)
           if (followUp.isFunctionCall) {
             for (const call of followUp.functionCalls) {
               if (call.name === 'add_event') {
-                const dateOnly = call.args.start ? call.args.start.split('T')[0] : null;
-                batchedEvents.push({
-                  ...call.args,
-                  date: dateOnly,
-                  startTime: call.args.start ? format(new Date(call.args.start), 'HH:mm') : '',
-                  endTime: call.args.end ? format(new Date(call.args.end), 'HH:mm') : '',
-                });
-                allPendingCalls.push(call);
+                pushAddEvent(call.args);
               } else if (call.name === 'repeat_event') {
                 const result = await executeQueryTool(call, allEvents);
                 if (result.requiresBatch && result.events?.length > 0) {
-                  result.events.forEach(ev => {
-                    batchedEvents.push({
-                      ...ev,
-                      startTime: ev.start ? format(new Date(ev.start), 'HH:mm') : '',
-                      endTime: ev.end ? format(new Date(ev.end), 'HH:mm') : '',
-                    });
-                    allPendingCalls.push({ name: 'add_event', args: ev });
-                  });
+                  result.events.forEach(ev => pushAddEvent(ev));
                 }
               } else if (call.name === 'delete_event') {
-                const existingEvent = allEvents?.find(e => e.id === call.args.id);
-                batchedDeletes.push({
-                  id: call.args.id,
-                  title: existingEvent?.title || `Event #${call.args.id}`,
-                  start: existingEvent?.start,
-                  end: existingEvent?.end,
-                });
+                const ev = allEvents?.find(e => e.id === call.args.id);
+                batchedDeletes.push({ id: call.args.id, title: ev?.title || `Event #${call.args.id}`, start: ev?.start, end: ev?.end });
                 allPendingCalls.push(call);
               } else if (call.name === 'update_event') {
-                const existingEvent = allEvents?.find(e => e.id === call.args.id);
-                batchedUpdates.push({
-                  id: call.args.id,
-                  title: existingEvent?.title || `Event #${call.args.id}`,
-                  updates: call.args.updates,
-                });
+                const ev = allEvents?.find(e => e.id === call.args.id);
+                batchedUpdates.push({ id: call.args.id, title: ev?.title || `Event #${call.args.id}`, updates: call.args.updates });
                 allPendingCalls.push(call);
+              } else {
+                const prod = mkProductivity(call);
+                if (prod) pendingProductivityActions.push(prod);
               }
             }
           } else if (followUp.text) {
@@ -234,11 +270,16 @@ export default function ChatView({ user, accessToken }) {
           }
         }
 
-        // If calendar mutation calls were batched, show confirmation card
-        const hasPendingActions = batchedEvents.length > 0 || batchedDeletes.length > 0 || batchedUpdates.length > 0;
-        if (hasPendingActions) {
+        const hasPendingCalendar = batchedEvents.length > 0 || batchedDeletes.length > 0 || batchedUpdates.length > 0;
+
+        if (pendingProductivityActions.length > 0 && !hasPendingCalendar) {
+          await sendMessage('assistant', aiResponse.text || 'Please review and confirm:', { pendingProductivityActions, isConfirmed: false }, currentSessionId);
+          setLoading(false);
+          return;
+        }
+        if (hasPendingCalendar) {
           let defaultMessage = 'Please review and confirm the following changes:';
-          if (batchedDeletes.length > 0 && batchedEvents.length === 0 && batchedUpdates.length === 0) {
+          if (batchedDeletes.length > 0 && batchedEvents.length === 0 && batchedUpdates.length === 0 && pendingProductivityActions.length === 0) {
             defaultMessage = `I will delete ${batchedDeletes.length} event${batchedDeletes.length > 1 ? 's' : ''}. Please confirm:`;
           }
           await sendMessage('assistant', aiResponse.text || defaultMessage, {
@@ -246,13 +287,13 @@ export default function ChatView({ user, accessToken }) {
             proposedDeletes: batchedDeletes,
             proposedUpdates: batchedUpdates,
             rawCalls: allPendingCalls,
+            ...(pendingProductivityActions.length > 0 ? { pendingProductivityActions } : {}),
             isConfirmed: false,
           }, currentSessionId);
           setLoading(false);
           return;
         }
 
-        // Pure text response (no mutations, no follow-up queries)
         if (!queryResultsForAI.length && aiResponse.text) {
           await sendMessage('assistant', aiResponse.text, {}, currentSessionId);
         }
@@ -275,6 +316,7 @@ export default function ChatView({ user, accessToken }) {
 
   const showEmptyState = !activeSessionId || !messages?.length;
 
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="chat-root">
       {/* Sidebar */}
@@ -301,122 +343,50 @@ export default function ChatView({ user, accessToken }) {
               <Moon className="w-4 h-4 text-white" />
             </div>
             <div>
-              <h1 className="chat-header-title">Ramadan AI</h1>
+              <h1 className="chat-header-title">{ramadanMode ? 'Ramadan AI' : 'RamaDone AI'}</h1>
               <p className="chat-header-subtitle">Powered by DeepSeek</p>
             </div>
           </div>
-          {/* Status pill */}
           <div className="chat-status-pill">
             <span className="chat-status-dot" />
             <span>Online</span>
           </div>
         </header>
 
-        {/* Messages */}
-        <div ref={scrollRef} className="chat-messages-scroll">
-          <div className="chat-messages-inner">
-            {showEmptyState ? (
-              <div className="chat-empty">
-                <div className="chat-empty-icon ai-gradient">
-                  <Sparkles className="w-8 h-8 text-white" />
-                </div>
-                <h2 className="chat-empty-title">Assalamu Alaikum! 🌙</h2>
-                <p className="chat-empty-subtitle">
-                  I'm your Ramadan scheduling assistant. Ask me anything about prayer times, your calendar, or how to plan your day.
-                </p>
-                <div className="chat-suggestions">
-                  {SUGGESTIONS.map((s, i) => (
-                    <button
-                      key={i}
-                      onClick={() => handleSend(s.text)}
-                      className="chat-suggestion-btn"
-                    >
-                      <span className="chat-suggestion-icon">{s.icon}</span>
-                      <span className="chat-suggestion-text">{s.text}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <>
-                {messages?.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`chat-message-row ${msg.role === 'user' ? 'chat-message-row--user' : ''}`}
-                  >
-                    <div className={`chat-avatar ${msg.role === 'user' ? 'chat-avatar--user' : 'ai-gradient'}`}>
-                      {msg.role === 'user'
-                        ? <User className="w-4 h-4 text-accent" />
-                        : <Bot className="w-4 h-4 text-white" />
-                      }
-                    </div>
-                    <div className={`chat-bubble ${msg.role === 'user' ? 'chat-bubble--user' : 'chat-bubble--assistant'}`}>
-                      {msg.role === 'user' ? (
-                        msg.content
-                      ) : (
-                        <div className="markdown-body">
-                          <ReactMarkdown>{msg.content || ''}</ReactMarkdown>
-                        </div>
-                      )}
-                      
-                      {(msg.proposedEvents?.length > 0 || msg.proposedDeletes?.length > 0 || msg.proposedUpdates?.length > 0) && (
-                        <InChatEventCard
-                          events={msg.proposedEvents || []}
-                          deletedEvents={msg.proposedDeletes || []}
-                          updatedEvents={msg.proposedUpdates || []}
-                          isConfirmed={msg.isConfirmed}
-                          onConfirmAll={() => handleConfirmEvents(msg.id, msg.proposedEvents, msg.rawCalls)}
-                        />
-                      )}
-                    </div>
-                  </div>
-                ))}
+        {/* Mode selector bar */}
+        <ChatModeBar activeMode={chatMode} onModeChange={setChatMode} />
 
-                {loading && (
-                  <div className="chat-message-row">
-                    <div className="chat-avatar ai-gradient">
-                      <Bot className="w-4 h-4 text-white" />
-                    </div>
-                    <div className="chat-bubble chat-bubble--assistant chat-bubble--loading">
-                      <span className="chat-dot chat-dot-1" />
-                      <span className="chat-dot chat-dot-2" />
-                      <span className="chat-dot chat-dot-3" />
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
+        {/* Messages / empty state */}
+        {showEmptyState ? (
+          <div className="chat-messages-scroll">
+            <div className="chat-messages-inner">
+              <ChatEmptyState
+                activeMode={chatMode}
+                ramadanMode={ramadanMode}
+                onSendSuggestion={handleSend}
+              />
+            </div>
           </div>
-        </div>
+        ) : (
+          <ChatMessageList
+            messages={messages}
+            loading={loading}
+            scrollRef={scrollRef}
+            onConfirmEvents={handleConfirmEvents}
+            onConfirmProductivity={handleConfirmProductivity}
+          />
+        )}
 
-        {/* Input Bar */}
-        <div className="chat-input-area">
-          <div className="chat-input-wrap">
-            <input
-              ref={inputRef}
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
-              placeholder="Message Ramadan AI..."
-              className="chat-input"
-              disabled={loading}
-            />
-            <button
-              onClick={() => handleSend()}
-              disabled={!input.trim() || loading}
-              className="chat-send-btn ai-gradient"
-              aria-label="Send message"
-            >
-              <Send className="w-4 h-4 text-white" />
-            </button>
-          </div>
-          <p className="chat-input-disclaimer">
-            Ramadan AI can make mistakes. Verify important info.
-          </p>
-        </div>
+        {/* Input bar */}
+        <ChatInputBar
+          input={input}
+          setInput={setInput}
+          loading={loading}
+          onSend={handleSend}
+          inputRef={inputRef}
+          ramadanMode={ramadanMode}
+        />
       </div>
-
     </div>
   );
 }

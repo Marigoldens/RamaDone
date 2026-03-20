@@ -1,0 +1,131 @@
+/* ===================================================
+   EXPENSES — Summary cards, category breakdown, transactions
+   =================================================== */
+
+.expenses-view {
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.expenses-header {
+  padding: 1.5rem 1.5rem 0;
+}
+
+/* ── Add buttons ── */
+.expenses-add-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.expenses-add-btn--income {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.25);
+}
+.expenses-add-btn--income:hover {
+  background-color: rgba(16, 185, 129, 0.18);
+}
+.expenses-add-btn--expense {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.25);
+}
+.expenses-add-btn--expense:hover {
+  background-color: rgba(239, 68, 68, 0.18);
+}
+
+/* ── Savings card ── */
+.expenses-savings-card {
+  margin: 0 1.5rem;
+  padding: 1rem 1.25rem;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--c-surface-elevated) 0%, color-mix(in srgb, var(--c-accent) 8%, var(--c-surface-elevated)) 100%);
+  border: 1px solid color-mix(in srgb, var(--c-accent) 20%, var(--c-border));
+}
+.expenses-savings-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+.expenses-savings-goal {
+  padding-top: 0.5rem;
+  border-top: 1px solid color-mix(in srgb, var(--c-border) 50%, transparent);
+}
+.expenses-savings-bar {
+  width: 100%;
+  height: 6px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--c-border) 40%, transparent);
+  margin-top: 0.5rem;
+  overflow: hidden;
+}
+.expenses-savings-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--c-accent), #10b981);
+  transition: width 0.4s ease;
+}
+
+/* ── Summary cards ── */
+.expenses-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  padding: 0 1.5rem;
+}
+
+.expense-summary-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 14px;
+  background-color: var(--c-surface-elevated);
+  border: 1px solid var(--c-border);
+}
+
+/* ── Category breakdown ── */
+.expenses-breakdown {
+  padding: 0 1.5rem;
+}
+
+.expense-category-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.625rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--c-border) 50%, transparent);
+}
+.expense-category-row:last-child {
+  border-bottom: none;
+}
+
+/* ── Transaction list ── */
+.expenses-list {
+  padding: 0 1.5rem 1.5rem;
+}
+
+.expense-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 12px;
+  background-color: var(--c-surface-elevated);
+  border: 1px solid var(--c-border);
+  transition: all 0.15s ease;
+}
+.expense-item:hover {
+  border-color: var(--c-accent);
+}

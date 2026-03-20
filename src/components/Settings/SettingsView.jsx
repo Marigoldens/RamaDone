@@ -162,7 +162,7 @@ export default function SettingsView({ user, onSignOut }) {
               </section>
             </div>
 
-            {/* ── RAMADAN ASSISTANT ─── */}
+            {/* ── RAMADAN & PRAYER MODES ─── */}
             <section className="settings-card">
               <div className="settings-section-header">
                 <div className="settings-section-icon settings-section-icon--green" style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}>
@@ -170,7 +170,7 @@ export default function SettingsView({ user, onSignOut }) {
                 </div>
                 <div>
                   <h2 className="settings-section-title">Ramadan Mode</h2>
-                  <p className="settings-section-subtitle">AI proactively suggests buffer blocks around prayers (Wudu, Sunnah)</p>
+                  <p className="settings-section-subtitle">Enables Ramadan-specific language, greetings, Iftar/Suhoor context, and the Ramadan day counter in the AI</p>
                 </div>
               </div>
               <div className="settings-toggle-row">
@@ -179,7 +179,29 @@ export default function SettingsView({ user, onSignOut }) {
                   className={`settings-toggle-btn ${prefs.ramadanMode ? 'settings-toggle-btn--active' : ''}`}
                   style={{ width: '100%', padding: '0.75rem', marginTop: '0.5rem' }}
                 >
-                  {prefs.ramadanMode ? 'Ramadan Mode: Enabled' : 'Ramadan Mode: Disabled'}
+                  {prefs.ramadanMode ? '🌙 Ramadan Mode: On' : '🗓️ Ramadan Mode: Off (General Planner)'}
+                </button>
+              </div>
+            </section>
+
+            {/* ── PRAYER MODE ─── */}
+            <section className="settings-card">
+              <div className="settings-section-header">
+                <div className="settings-section-icon" style={{ backgroundColor: 'rgba(99, 102, 241, 0.1)', color: '#6366f1' }}>
+                  <Clock size={18} />
+                </div>
+                <div>
+                  <h2 className="settings-section-title">Prayer Mode</h2>
+                  <p className="settings-section-subtitle">Shows the Prayers tab and injects today's prayer times into the AI. For Muslim users.</p>
+                </div>
+              </div>
+              <div className="settings-toggle-row">
+                <button
+                  onClick={() => setPref('prayerMode', !prefs.prayerMode)}
+                  className={`settings-toggle-btn ${prefs.prayerMode ? 'settings-toggle-btn--active' : ''}`}
+                  style={{ width: '100%', padding: '0.75rem', marginTop: '0.5rem' }}
+                >
+                  {prefs.prayerMode ? '🕌 Prayer Times: On' : '⏰ Prayer Times: Off'}
                 </button>
               </div>
             </section>

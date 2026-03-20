@@ -847,3 +847,66 @@
   background: linear-gradient(135deg, var(--c-accent), var(--c-primary));
 }
 .btn-gradient-accent { color: var(--c-surface); }
+
+/* ─── Choice popup (Add Event vs Add Task) ──────── */
+.cal-choice-popup {
+  position: fixed;
+  bottom: 50%;
+  left: 50%;
+  transform: translate(-50%, 50%);
+  z-index: 52;
+  background-color: var(--c-surface-elevated);
+  border: 1px solid var(--c-border);
+  border-radius: 1.25rem;
+  padding: 1.25rem 1.5rem;
+  min-width: 16rem;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.25);
+  animation: cal-slide-up 0.18s ease;
+}
+.cal-choice-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 0.75rem;
+  border-radius: 14px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  border: 2px solid transparent;
+}
+.cal-choice-btn--event {
+  background-color: color-mix(in srgb, var(--c-accent) 10%, var(--c-surface));
+  color: var(--c-accent);
+  border-color: color-mix(in srgb, var(--c-accent) 25%, transparent);
+}
+.cal-choice-btn--event:hover {
+  background-color: color-mix(in srgb, var(--c-accent) 18%, var(--c-surface));
+}
+.cal-choice-btn--task {
+  background-color: color-mix(in srgb, #3b82f6 10%, var(--c-surface));
+  color: #3b82f6;
+  border-color: color-mix(in srgb, #3b82f6 25%, transparent);
+}
+.cal-choice-btn--task:hover {
+  background-color: color-mix(in srgb, #3b82f6 18%, var(--c-surface));
+}
+
+/* ─── Task count pill on month cells ────────────── */
+.cal-month-task-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.5625rem;
+  font-weight: 700;
+  color: #3b82f6;
+  background-color: color-mix(in srgb, #3b82f6 12%, var(--c-surface-elevated));
+  border-radius: 4px;
+  padding: 0 0.25rem;
+  height: 1rem;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+

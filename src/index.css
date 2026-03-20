@@ -5,6 +5,10 @@
 @import "./styles/components/settings.css";
 @import "./styles/components/landing.css";
 @import "./styles/components/prayers.css";
+@import "./styles/components/dashboard.css";
+@import "./styles/components/tasks.css";
+@import "./styles/components/expenses.css";
+@import "./styles/components/habits.css";
 
 /*
  * ============================================================

@@ -19,7 +19,8 @@ const DEFAULTS = {
   calcMethod: 2,        // ISNA
   calendarId: null,
   syncPrayerTimes: false, // Whether to sync daily prayers to Google Calendar
-  ramadanMode: false,     // Smart buffer blocks for prayers
+  ramadanMode: false,     // Ramadan theming, greetings, Iftar/Suhoor context
+  prayerMode: true,       // Prayer times context injected into AI + Prayers tab visible
 };
 
 /**

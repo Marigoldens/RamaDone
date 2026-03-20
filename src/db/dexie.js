@@ -49,4 +49,30 @@ db.version(4).stores({
     .delete();
 });
 
+/**
+ * Version 5: Productivity Suite expansion.
+ *
+ * NEW TABLES:
+ * - tasks:         To-do / Kanban items with priority, category, status
+ * - expenses:      Income & expense transactions
+ * - budgets:       Monthly budget caps per category
+ * - habits:        Trackable daily/weekly habits
+ * - habitLogs:     Per-day completion records for each habit
+ * - notifications: Locally-scheduled browser notification queue
+ */
+db.version(5).stores({
+  chatSessions: '++id, title, updatedAt',
+  messages: '++id, sessionId, role, timestamp',
+  events: '++id, googleId, title, start, end, type, date, synced, updatedAt, deleted',
+  preferences: 'key',
+  prayerTimes: 'date',
+  // ── Productivity Suite tables ──
+  tasks: '++id, title, status, priority, dueDate, category, createdAt, updatedAt, completed',
+  expenses: '++id, amount, type, category, date, note, recurring, createdAt',
+  budgets: '++id, category, amount, month',
+  habits: '++id, name, emoji, frequency, category, createdAt, archived',
+  habitLogs: '++id, habitId, date, completed, count, note',
+  notifications: '++id, type, title, body, scheduledAt, fired, relatedId',
+});
+
 export default db;

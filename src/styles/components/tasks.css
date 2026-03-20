@@ -1,0 +1,196 @@
+/* ===================================================
+   TASKS — Kanban board, task cards, list view
+   =================================================== */
+
+.tasks-view {
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.tasks-header {
+  padding: 1.5rem 1.5rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.tasks-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 0.875rem;
+  border-radius: 12px;
+  background-color: var(--c-surface-elevated);
+  border: 1px solid var(--c-border);
+  transition: border-color 0.2s ease;
+}
+.tasks-search:focus-within {
+  border-color: var(--c-accent);
+}
+
+/* ── Kanban Board ── */
+.kanban-board {
+  display: flex;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  overflow-x: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+@media (max-width: 767px) {
+  .kanban-board {
+    flex-direction: column;
+    overflow-x: visible;
+  }
+}
+
+.kanban-column {
+  flex: 1;
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+@media (max-width: 767px) {
+  .kanban-column {
+    min-width: unset;
+  }
+}
+
+.kanban-column__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  border-radius: 10px;
+  background-color: var(--c-surface-elevated);
+  border-left: 3px solid;
+}
+
+.kanban-column__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+  min-height: 60px;
+}
+
+/* ── Task Card ── */
+.task-card {
+  background-color: var(--c-surface-elevated);
+  border: 1px solid var(--c-border);
+  border-radius: 14px;
+  padding: 0.875rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+  position: relative;
+}
+.task-card:hover {
+  border-color: var(--c-accent);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+.task-card--overdue {
+  border-color: rgba(239, 68, 68, 0.3);
+  background-color: color-mix(in srgb, rgb(239, 68, 68) 3%, var(--c-surface-elevated));
+}
+
+.task-card__actions {
+  display: flex;
+  gap: 0.25rem;
+  position: absolute;
+  top: 0.625rem;
+  right: 0.625rem;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.task-card:hover .task-card__actions {
+  opacity: 1;
+}
+
+/* ── List view ── */
+.task-list {
+  padding: 1rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* ── Modal (shared between Tasks / Expenses / Habits) ── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+  animation: fadeIn 0.15s ease;
+}
+
+@media (min-width: 768px) {
+  .modal-overlay {
+    align-items: center;
+    padding: 1rem;
+  }
+}
+
+.modal-content {
+  background-color: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: 20px 20px 0 0;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 480px;
+  max-height: 90dvh;
+  overflow-y: auto;
+  animation: slideUp 0.25s ease;
+}
+
+@media (min-width: 768px) {
+  .modal-content {
+    border-radius: 20px;
+  }
+}
+
+.modal-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--c-border);
+  background-color: var(--c-surface-elevated);
+  color: var(--c-text);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+.modal-input:focus {
+  border-color: var(--c-accent);
+}
+.modal-input::placeholder {
+  color: color-mix(in srgb, var(--c-text-muted) 50%, transparent);
+}
+
+/* Ensure selects get proper styling */
+.modal-input option {
+  background-color: var(--c-surface);
+  color: var(--c-text);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(40px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}

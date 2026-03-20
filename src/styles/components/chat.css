@@ -550,3 +550,78 @@
 .ai-gradient {
   background: linear-gradient(135deg, var(--c-accent), var(--c-primary));
 }
+
+/* ─── Chat Mode Bar ──────────────────────────────── */
+.chat-mode-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--c-border);
+  overflow-x: auto;
+  scrollbar-width: none;
+  background-color: color-mix(in srgb, var(--c-surface) 90%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.chat-mode-bar::-webkit-scrollbar { display: none; }
+
+.chat-mode-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--c-text-muted);
+  background-color: var(--c-surface-elevated);
+  border: 1px solid var(--c-border);
+  white-space: nowrap;
+  transition: color 0.15s, background-color 0.15s, border-color 0.15s;
+  cursor: pointer;
+}
+
+.chat-mode-pill-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+  flex-shrink: 0;
+}
+
+.chat-mode-pill:hover {
+  color: var(--c-text);
+  background-color: color-mix(in srgb, var(--c-accent) 8%, var(--c-surface-elevated));
+  border-color: color-mix(in srgb, var(--c-accent) 30%, transparent);
+}
+
+/* Active states - each mode has a distinct accent colour */
+.chat-mode-pill--all.chat-mode-pill--active {
+  color: #fff;
+  background: linear-gradient(135deg, var(--c-accent), var(--c-primary));
+  border-color: transparent;
+}
+
+.chat-mode-pill--calendar.chat-mode-pill--active {
+  color: #fff;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-color: transparent;
+}
+
+.chat-mode-pill--tasks.chat-mode-pill--active {
+  color: #fff;
+  background: linear-gradient(135deg, #0ea5e9, #38bdf8);
+  border-color: transparent;
+}
+
+.chat-mode-pill--expenses.chat-mode-pill--active {
+  color: #fff;
+  background: linear-gradient(135deg, #10b981, #34d399);
+  border-color: transparent;
+}
+
+.chat-mode-pill--habits.chat-mode-pill--active {
+  color: #fff;
+  background: linear-gradient(135deg, #f59e0b, #fb923c);
+  border-color: transparent;
+}

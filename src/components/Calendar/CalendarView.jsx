@@ -5,7 +5,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   ChevronLeft, ChevronRight, Plus, Cloud,
-  RefreshCcw, CheckCircle2,
+  RefreshCcw, CheckCircle2, CalendarPlus, ListPlus,
 } from 'lucide-react';
 import {
   format, addDays, addWeeks, addMonths, addYears,
@@ -24,12 +24,13 @@ import AddEventModal from './AddEventModal';
 
 const VIEWS = ['Day', 'Week', 'Month', 'Year'];
 
-export default function CalendarView({ accessToken, onSignIn }) {
+export default function CalendarView({ accessToken, onSignIn, onNavigate, onAddTaskForDate }) {
   const [view, setView]               = useState('Day');
   const [selectedDate, setSelectedDate] = useState(getTodayString());
   const [showAddModal, setShowAddModal] = useState(false);
   const [prefilledTime, setPrefilledTime] = useState(null);
   const [justSynced, setJustSynced]     = useState(false);
+  const [showChoice, setShowChoice]     = useState(null); // { date, time? } or null
 
   const { addEvent } = useEvents(selectedDate);
   const { prefs, setPref } = usePreferences();
@@ -67,8 +68,7 @@ export default function CalendarView({ accessToken, onSignIn }) {
   };
 
   const handleSlotTap = (time) => {
-    setPrefilledTime(time);
-    setShowAddModal(true);
+    setShowChoice({ date: selectedDate, time });
   };
 
   /* Jump from Week/Month/Year to specific Day view */
@@ -178,11 +178,43 @@ export default function CalendarView({ accessToken, onSignIn }) {
       {/* FAB */}
       <button
         className="cal-fab"
-        onClick={() => { setPrefilledTime(null); setShowAddModal(true); }}
-        aria-label="Add event"
+        onClick={() => setShowChoice({ date: selectedDate, time: null })}
+        aria-label="Add event or task"
       >
         <Plus className="w-7 h-7 text-white" />
       </button>
+
+      {/* Choice popup: Add Event vs Add Task */}
+      {showChoice && (
+        <div className="modal-overlay" onClick={() => setShowChoice(null)}>
+          <div className="cal-choice-popup" onClick={e => e.stopPropagation()}>
+            <p className="text-sm font-bold text-text mb-3">What would you like to add?</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setPrefilledTime(showChoice.time);
+                  setShowAddModal(true);
+                  setShowChoice(null);
+                }}
+                className="cal-choice-btn cal-choice-btn--event"
+              >
+                <CalendarPlus className="w-5 h-5" />
+                <span>Event</span>
+              </button>
+              <button
+                onClick={() => {
+                  setShowChoice(null);
+                  onAddTaskForDate?.(showChoice.date);
+                }}
+                className="cal-choice-btn cal-choice-btn--task"
+              >
+                <ListPlus className="w-5 h-5" />
+                <span>Task</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add event modal */}
       {showAddModal && (
