@@ -1,13 +1,15 @@
 /**
  * @fileoverview Calendar Week View — 7-day horizontal timeline.
- * Shows Mon–Sun columns with hourly rows and event pills.
+ * Shows Mon–Sun columns with hourly rows, event pills, and task pills.
  */
 import { startOfWeek, addDays, format, isSameDay, isToday } from 'date-fns';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { useEventsRange } from '../../hooks/useEventsRange';
 import { useEvents } from '../../hooks/useEvents';
 import { timeToGridRow, formatTime } from '../../utils/timeHelpers';
 import { EVENT_TYPES } from '../../utils/constants';
-import { Trash2 } from 'lucide-react';
+import { Trash2, CheckSquare } from 'lucide-react';
+import db from '../../db/dexie';
 
 export default function WeekView({ date, timeFormat, onDayClick }) {
   const weekStart = startOfWeek(new Date(date + 'T12:00:00'), { weekStartsOn: 1 });
@@ -17,10 +19,24 @@ export default function WeekView({ date, timeFormat, onDayClick }) {
   const events   = useEventsRange(startStr, endStr);
   const hours    = Array.from({ length: 24 }, (_, i) => i);
 
+  // Query tasks for the entire week
+  const weekTasks = useLiveQuery(
+    () => db.tasks.where('dueDate').between(startStr, endStr, true, true).toArray(),
+    [startStr, endStr]
+  ) ?? [];
+
   const eventsByDay = {};
-  days.forEach((d) => { eventsByDay[format(d, 'yyyy-MM-dd')] = []; });
+  const tasksByDay = {};
+  days.forEach((d) => {
+    const ds = format(d, 'yyyy-MM-dd');
+    eventsByDay[ds] = [];
+    tasksByDay[ds] = [];
+  });
   (events || []).forEach((ev) => {
     if (eventsByDay[ev.date]) eventsByDay[ev.date].push(ev);
+  });
+  weekTasks.forEach((t) => {
+    if (tasksByDay[t.dueDate]) tasksByDay[t.dueDate].push(t);
   });
 
   return (
@@ -30,6 +46,8 @@ export default function WeekView({ date, timeFormat, onDayClick }) {
         <div className="cal-week-gutter" />
         {days.map((d) => {
           const isT = isToday(d);
+          const ds = format(d, 'yyyy-MM-dd');
+          const taskCount = (tasksByDay[ds] || []).length;
           return (
             <button
               key={d.toString()}
@@ -40,6 +58,12 @@ export default function WeekView({ date, timeFormat, onDayClick }) {
               <span className={`cal-week-day-num ${isT ? 'cal-week-day-num--today' : ''}`}>
                 {format(d, 'd')}
               </span>
+              {taskCount > 0 && (
+                <span className="cal-week-task-badge">
+                  <CheckSquare className="w-2.5 h-2.5" />
+                  {taskCount}
+                </span>
+              )}
             </button>
           );
         })}
@@ -65,6 +89,7 @@ export default function WeekView({ date, timeFormat, onDayClick }) {
           {days.map((d) => {
             const dateStr = format(d, 'yyyy-MM-dd');
             const dayEvents = eventsByDay[dateStr] || [];
+            const dayTasks = tasksByDay[dateStr] || [];
             return (
               <div key={dateStr} className="cal-week-col">
                 {/* Hour lines */}
@@ -79,6 +104,20 @@ export default function WeekView({ date, timeFormat, onDayClick }) {
                 {dayEvents.map((ev) => (
                   <WeekEventPill key={ev.id} event={ev} timeFormat={timeFormat} />
                 ))}
+                {/* Task indicators at bottom of day column */}
+                {dayTasks.length > 0 && (
+                  <div className="cal-week-tasks-bottom">
+                    {dayTasks.slice(0, 3).map(t => (
+                      <div key={t.id} className={`cal-week-task-chip ${t.status === 'done' ? 'cal-week-task-chip--done' : ''}`}>
+                        <span className="cal-week-task-chip__dot" />
+                        <span className="cal-week-task-chip__title">{t.title}</span>
+                      </div>
+                    ))}
+                    {dayTasks.length > 3 && (
+                      <span className="cal-week-task-more">+{dayTasks.length - 3}</span>
+                    )}
+                  </div>
+                )}
                 {/* Today line */}
                 {isToday(d) && <WeekNowLine />}
               </div>

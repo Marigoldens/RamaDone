@@ -9,10 +9,10 @@
 ## ✨ Features Overview
 
 ### 📊 Dashboard
-A unified home screen with quick statistics across all modules — pending tasks, today's spending, habit streak completion, and upcoming events. Includes quick-navigate buttons to jump into any feature.
+A unified home screen with quick statistics across all modules — pending tasks, today's spending, habit streak completion, and upcoming events. Features a **settings modal** with toggle switches for each widget, **color-accented cards** (blue=tasks, green=expenses, purple=habits, gold=calendar), and a floating **✨ Ask AI** button for quick access to the AI chatbot.
 
 ### 📅 Calendar
-Full interactive calendar with **Day**, **Week**, **Month**, and **Year** views. Events display on a scrollable 24-hour timeline grid with color-coded event blocks. Supports event creation via modal, viewing event details, and navigating across dates.
+Full interactive calendar with **Day**, **Week**, **Month**, and **Year** views. Events display on a scrollable 24-hour timeline grid with color-coded event blocks. **Task pills** from the task manager also appear on the Day and Week views (blue pills with checkbox icon, distinct from green events). Includes an **animated choice popup** for creating events or tasks directly from the calendar.
 
 - **Google Calendar Sync** — Two-way sync with a dedicated "Ramadan Schedule" Google Calendar
 - **Delta Sync** — Only pushes modified/new events for fast updates
@@ -20,10 +20,10 @@ Full interactive calendar with **Day**, **Week**, **Month**, and **Year** views.
 - **Event Types** — Prayer, Iftar, Suhoor, and Custom events with distinct visual styles
 
 ### ✅ Task Manager
-A planner-style task management system with status tracking (`todo`, `in-progress`, `done`), priority levels (`low`, `medium`, `high`), due dates, categories, and notes. Tasks can be created from the calendar view with a pre-filled date.
+A planner-style task management system with **kanban board** and **list view** layouts. Supports status tracking (`todo`, `in-progress`, `done`), priority levels (`low`, `medium`, `high`, `urgent`), due dates, categories, and notes. Features polished **empty states** with encouraging messages per column, **count badges**, and a refined **Add Task modal** with gradient submit button. Tasks can be created from the calendar view with a pre-filled date.
 
 ### 💰 Expense Tracker
-Full income & expense tracking with categories (Food, Transport, Health, etc.), date filtering, totals, and per-category breakdowns. Supports both expense and income entry types.
+Full income & expense tracking with **custom month navigation** (prev/next arrows instead of raw input), a **Month/Year tab toggle**, and a **balance overview card** showing income vs. expense with a visual bar. Category breakdowns include **mini progress bars**. Features an **AI Monthly Report** button that navigates to the chat for AI-powered financial insights, and a **Year Overview** tab with a 12-month bar chart showing income vs. expenses side-by-side. Modal UIs have **hidden number spinners** and **gradient submit buttons**.
 
 ### 🎯 Habit Tracker
 Daily/weekly habit tracking with emoji identifiers, category grouping, streak tracking, and completion logs. Habits can be archived (soft-deleted) without losing historical data.

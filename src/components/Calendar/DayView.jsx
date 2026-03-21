@@ -1,15 +1,22 @@
 /**
  * @fileoverview Calendar Day View — 24-hour vertical timeline.
- * Improved over original: events no longer span full width,
- * prayer events are a proper left-bordered pill instead.
+ * Shows calendar events AND tasks due on this date.
  */
+import { useLiveQuery } from 'dexie-react-hooks';
 import { timeToGridRow, gridRowToTime, formatTime } from '../../utils/timeHelpers';
 import { EVENT_TYPES } from '../../utils/constants';
 import { useEvents } from '../../hooks/useEvents';
-import { Trash2 } from 'lucide-react';
+import { Trash2, CheckSquare } from 'lucide-react';
+import db from '../../db/dexie';
 
 export default function DayView({ date, timeFormat, onSlotTap }) {
   const { events } = useEvents(date);
+
+  // Query tasks due on this date
+  const tasks = useLiveQuery(
+    () => db.tasks.where('dueDate').equals(date).toArray(),
+    [date]
+  ) ?? [];
 
   const hours = Array.from({ length: 24 }, (_, i) => i);
 
@@ -24,6 +31,29 @@ export default function DayView({ date, timeFormat, onSlotTap }) {
 
   return (
     <div className="cal-day-root">
+      {/* Task strip at top if there are tasks */}
+      {tasks.length > 0 && (
+        <div className="cal-day-tasks-strip">
+          <div className="cal-day-tasks-strip__header">
+            <CheckSquare className="w-3.5 h-3.5 text-blue-500" />
+            <span>Tasks due today</span>
+          </div>
+          <div className="cal-day-tasks-strip__list">
+            {tasks.map(t => (
+              <div key={t.id} className={`cal-task-pill ${t.status === 'done' ? 'cal-task-pill--done' : ''}`}>
+                <span className="cal-task-pill__dot" />
+                <span className="cal-task-pill__title">{t.title}</span>
+                {t.priority && (
+                  <span className={`cal-task-pill__priority cal-task-pill__priority--${t.priority}`}>
+                    {t.priority}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="cal-day-grid" onClick={handleGridClick}>
         {/* Time labels */}
         {hours.map((h) => (

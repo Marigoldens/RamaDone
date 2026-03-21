@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import {
   CheckSquare, Wallet, Target, Clock, Plus, Sparkles,
   TrendingUp, Calendar, ArrowRight, Eye, EyeOff, Settings2,
+  MessageCircle, X,
 } from 'lucide-react';
 import db from '../../db/dexie';
 
@@ -52,6 +53,10 @@ export default function DashboardView({ onNavigate }) {
     .filter(e => e.type === 'expense')
     .reduce((sum, e) => sum + (e.amount || 0), 0);
 
+  const todayIncome = todayExpenses
+    .filter(e => e.type === 'income')
+    .reduce((sum, e) => sum + (e.amount || 0), 0);
+
   // top expense category
   const topCategory = useMemo(() => {
     const map = {};
@@ -73,6 +78,7 @@ export default function DashboardView({ onNavigate }) {
 
   const completedIdSet = new Set(completedHabitIds.map(l => l.habitId));
   const habitsNotDone = allHabits.filter(h => !completedIdSet.has(h.id));
+  const habitPct = allHabits.length > 0 ? Math.round((habitsChecked / allHabits.length) * 100) : 0;
 
   // ─── Calendar data ───
   const todayEvents = useLiveQuery(
@@ -81,6 +87,14 @@ export default function DashboardView({ onNavigate }) {
   const nextEvent = todayEvents.sort((a, b) => (a.start || '').localeCompare(b.start || ''))[0];
 
   const greeting = getGreeting();
+
+  // Close modal on Escape key
+  useEffect(() => {
+    if (!showSettings) return;
+    const handleEsc = (e) => { if (e.key === 'Escape') setShowSettings(false); };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [showSettings]);
 
   return (
     <div className="dashboard-view">
@@ -95,33 +109,46 @@ export default function DashboardView({ onNavigate }) {
           </p>
         </div>
         <button
-          onClick={() => setShowSettings(!showSettings)}
+          onClick={() => setShowSettings(true)}
           className="dashboard-header__icon"
-          title="Toggle widgets"
+          title="Dashboard settings"
         >
           <Settings2 className="w-5 h-5 text-accent" />
         </button>
       </header>
 
-      {/* ════ Widget Toggle Panel ════ */}
+      {/* ════ Settings Modal ════ */}
       {showSettings && (
-        <div className="dashboard-toggle-panel">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Show / Hide Widgets</span>
-          <div className="flex gap-2 mt-2 flex-wrap">
-            {Object.entries({ tasks: 'Tasks', expenses: 'Expenses', habits: 'Habits', calendar: 'Calendar' }).map(([key, label]) => (
-              <button
-                key={key}
-                onClick={() => toggleWidget(key)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
-                  widgetVis[key]
-                    ? 'bg-accent/10 text-accent border-accent/20'
-                    : 'bg-surface text-text-muted border-border/50'
-                }`}
-              >
-                {widgetVis[key] ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                {label}
+        <div className="dash-modal-overlay" onClick={() => setShowSettings(false)}>
+          <div className="dash-modal" onClick={e => e.stopPropagation()}>
+            <div className="dash-modal__header">
+              <h2 className="text-base font-bold text-text">Dashboard Settings</h2>
+              <button onClick={() => setShowSettings(false)} className="dash-modal__close">
+                <X className="w-5 h-5" />
               </button>
-            ))}
+            </div>
+            <p className="text-xs text-text-muted mb-4">Choose which widgets to show on your dashboard</p>
+            <div className="dash-modal__toggles">
+              {[
+                { key: 'tasks',    label: 'Tasks',    icon: <CheckSquare className="w-4 h-4" />, color: '#3b82f6' },
+                { key: 'expenses', label: 'Expenses', icon: <Wallet className="w-4 h-4" />,     color: '#10b981' },
+                { key: 'habits',   label: 'Habits',   icon: <Target className="w-4 h-4" />,     color: '#8b5cf6' },
+                { key: 'calendar', label: 'Calendar', icon: <Calendar className="w-4 h-4" />,   color: 'var(--c-accent)' },
+              ].map(w => (
+                <div key={w.key} className="dash-toggle-row">
+                  <div className="dash-toggle-row__info">
+                    <span style={{ color: w.color }}>{w.icon}</span>
+                    <span className="text-sm font-medium text-text">{w.label}</span>
+                  </div>
+                  <button
+                    onClick={() => toggleWidget(w.key)}
+                    className={`dash-toggle-switch ${widgetVis[w.key] ? 'dash-toggle-switch--on' : ''}`}
+                  >
+                    <span className="dash-toggle-knob" />
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -148,19 +175,22 @@ export default function DashboardView({ onNavigate }) {
         {widgetVis.tasks && (
           <button onClick={() => onNavigate('tasks')} className="dashboard-widget dashboard-widget--tasks">
             <div className="dashboard-widget__header">
-              <CheckSquare className="w-5 h-5 text-blue-500" />
-              <span className="text-xs font-bold uppercase tracking-wider text-text-muted">Tasks</span>
-              <ArrowRight className="w-4 h-4 text-text-muted ml-auto" />
+              <div className="dashboard-widget__icon-wrap dashboard-widget__icon-wrap--blue">
+                <CheckSquare className="w-4 h-4" />
+              </div>
+              <span className="dashboard-widget__label">Tasks</span>
+              <ArrowRight className="w-3.5 h-3.5 text-text-muted ml-auto opacity-0 group-hover:opacity-100" />
             </div>
             <div className="dashboard-widget__body">
               <span className="dashboard-widget__number">{tasksDueToday.length}</span>
-              <span className="text-xs text-text-muted">due today</span>
+              <span className="dashboard-widget__subtitle">due today</span>
             </div>
             {/* Show actual task names */}
             {tasksDueToday.length > 0 && (
               <div className="dashboard-widget__detail-list">
                 {tasksDueToday.slice(0, 3).map(t => (
                   <div key={t.id} className="dashboard-widget__detail-item">
+                    <span className={`dashboard-widget__detail-dot ${t.status === 'done' ? 'dashboard-widget__detail-dot--done' : ''}`} />
                     <span className={`text-[11px] font-medium truncate ${t.status === 'done' ? 'line-through text-text-muted' : 'text-text'}`}>
                       {t.title}
                     </span>
@@ -172,7 +202,9 @@ export default function DashboardView({ onNavigate }) {
               </div>
             )}
             <div className="dashboard-widget__footer">
-              <span className="text-xs text-text-muted">{tasksCompleted}/{totalTasks} completed</span>
+              <div className="dashboard-widget__stat-row">
+                <span className="text-[11px] text-text-muted">{tasksCompleted}/{totalTasks} completed overall</span>
+              </div>
             </div>
           </button>
         )}
@@ -181,17 +213,29 @@ export default function DashboardView({ onNavigate }) {
         {widgetVis.expenses && (
           <button onClick={() => onNavigate('expenses')} className="dashboard-widget dashboard-widget--expenses">
             <div className="dashboard-widget__header">
-              <Wallet className="w-5 h-5 text-emerald-500" />
-              <span className="text-xs font-bold uppercase tracking-wider text-text-muted">Spent Today</span>
-              <ArrowRight className="w-4 h-4 text-text-muted ml-auto" />
+              <div className="dashboard-widget__icon-wrap dashboard-widget__icon-wrap--green">
+                <Wallet className="w-4 h-4" />
+              </div>
+              <span className="dashboard-widget__label">Expenses</span>
+              <ArrowRight className="w-3.5 h-3.5 text-text-muted ml-auto opacity-0 group-hover:opacity-100" />
             </div>
             <div className="dashboard-widget__body">
               <span className="dashboard-widget__number">{fmtIQD(todaySpend)}</span>
-              <span className="text-xs text-text-muted">{todayExpenses.filter(e => e.type === 'expense').length} transactions</span>
+              <span className="dashboard-widget__subtitle">
+                {todayExpenses.filter(e => e.type === 'expense').length} transactions
+              </span>
             </div>
+            {todayIncome > 0 && (
+              <div className="dashboard-widget__income-badge">
+                <TrendingUp className="w-3 h-3" />
+                <span>+{fmtIQD(todayIncome)} income</span>
+              </div>
+            )}
             {topCategory && (
               <div className="dashboard-widget__footer">
-                <span className="text-xs text-text-muted">Top: <strong className="text-text font-semibold capitalize">{topCategory}</strong></span>
+                <span className="text-[11px] text-text-muted">
+                  Top: <strong className="text-text font-semibold capitalize">{topCategory}</strong>
+                </span>
               </div>
             )}
           </button>
@@ -201,13 +245,15 @@ export default function DashboardView({ onNavigate }) {
         {widgetVis.habits && (
           <button onClick={() => onNavigate('habits')} className="dashboard-widget dashboard-widget--habits">
             <div className="dashboard-widget__header">
-              <Target className="w-5 h-5 text-purple-500" />
-              <span className="text-xs font-bold uppercase tracking-wider text-text-muted">Habits</span>
-              <ArrowRight className="w-4 h-4 text-text-muted ml-auto" />
+              <div className="dashboard-widget__icon-wrap dashboard-widget__icon-wrap--purple">
+                <Target className="w-4 h-4" />
+              </div>
+              <span className="dashboard-widget__label">Habits</span>
+              <ArrowRight className="w-3.5 h-3.5 text-text-muted ml-auto opacity-0 group-hover:opacity-100" />
             </div>
             <div className="dashboard-widget__body">
-              <span className="dashboard-widget__number">{habitsChecked}/{allHabits.length}</span>
-              <span className="text-xs text-text-muted">completed</span>
+              <span className="dashboard-widget__number">{habitsChecked}<span className="text-base font-semibold text-text-muted">/{allHabits.length}</span></span>
+              <span className="dashboard-widget__subtitle">{habitPct}% completed</span>
             </div>
             {/* Show which habits are still undone */}
             {habitsNotDone.length > 0 && habitsNotDone.length <= 4 && (
@@ -227,7 +273,7 @@ export default function DashboardView({ onNavigate }) {
               <div className="dashboard-widget__progress-bar">
                 <div
                   className="dashboard-widget__progress-fill"
-                  style={{ width: `${Math.min(100, (habitsChecked / allHabits.length) * 100)}%` }}
+                  style={{ width: `${Math.min(100, habitPct)}%` }}
                 />
               </div>
             )}
@@ -238,25 +284,34 @@ export default function DashboardView({ onNavigate }) {
         {widgetVis.calendar && (
           <button onClick={() => onNavigate('calendar')} className="dashboard-widget dashboard-widget--calendar">
             <div className="dashboard-widget__header">
-              <Calendar className="w-5 h-5 text-accent" />
-              <span className="text-xs font-bold uppercase tracking-wider text-text-muted">Schedule</span>
-              <ArrowRight className="w-4 h-4 text-text-muted ml-auto" />
+              <div className="dashboard-widget__icon-wrap dashboard-widget__icon-wrap--gold">
+                <Calendar className="w-4 h-4" />
+              </div>
+              <span className="dashboard-widget__label">Schedule</span>
+              <ArrowRight className="w-3.5 h-3.5 text-text-muted ml-auto opacity-0 group-hover:opacity-100" />
             </div>
             <div className="dashboard-widget__body">
               <span className="dashboard-widget__number">{todayEvents.length}</span>
-              <span className="text-xs text-text-muted">events today</span>
+              <span className="dashboard-widget__subtitle">events today</span>
             </div>
             {nextEvent && (
               <div className="dashboard-widget__footer">
-                <span className="text-xs text-text-muted">
+                <span className="text-[11px] text-text-muted">
                   Next: <strong className="text-text font-semibold">{nextEvent.title}</strong>
-                  {nextEvent.start && <span className="ml-1 text-accent font-mono">{nextEvent.start}</span>}
+                  {nextEvent.start && <span className="ml-1 text-accent font-mono text-[10px]">{nextEvent.start}</span>}
                 </span>
               </div>
             )}
           </button>
         )}
       </div>
+
+      {/* ════ AI Chat Button ════ */}
+      <button onClick={() => onNavigate('chat')} className="dashboard-ai-fab">
+        <MessageCircle className="w-5 h-5" />
+        <span>Ask AI Assistant</span>
+        <Sparkles className="w-4 h-4 dashboard-ai-fab__sparkle" />
+      </button>
     </div>
   );
 }

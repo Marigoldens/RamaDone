@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { format, endOfMonth } from 'date-fns';
+import { format, endOfMonth, addMonths, subMonths, startOfYear, endOfYear, eachMonthOfInterval } from 'date-fns';
 import {
   Plus, TrendingUp, TrendingDown, Wallet, X, ArrowUpCircle, ArrowDownCircle,
   ShoppingCart, Utensils, Car, Home, Heart, Gamepad2, Smartphone, BookOpen,
   MoreHorizontal, PiggyBank, Briefcase, Gift, DollarSign, Target,
+  ChevronLeft, ChevronRight, BarChart3, FileText, Sparkles,
 } from 'lucide-react';
 import db from '../../db/dexie';
 
@@ -33,15 +34,25 @@ const INCOME_SOURCES = [
 ];
 
 /**
- * Expenses View — IQD currency, separate income/expense modals, savings tracker.
+ * Expenses View — IQD currency, month/year views, balance overview.
  * All data stored in Dexie — fully offline.
  */
-export default function ExpensesView() {
+export default function ExpensesView({ onNavigate }) {
   const [showModal, setShowModal]       = useState(null); // 'expense' | 'income' | null
   const [filterMonth, setFilterMonth]   = useState(format(new Date(), 'yyyy-MM'));
+  const [viewTab, setViewTab]           = useState('month'); // 'month' | 'year'
 
+  const monthDate  = new Date(filterMonth + '-01');
   const monthStart = filterMonth + '-01';
-  const monthEnd   = format(endOfMonth(new Date(filterMonth + '-01')), 'yyyy-MM-dd');
+  const monthEnd   = format(endOfMonth(monthDate), 'yyyy-MM-dd');
+  const monthLabel = format(monthDate, 'MMMM yyyy');
+
+  function prevMonth() {
+    setFilterMonth(format(subMonths(monthDate, 1), 'yyyy-MM'));
+  }
+  function nextMonth() {
+    setFilterMonth(format(addMonths(monthDate, 1), 'yyyy-MM'));
+  }
 
   const transactions = useLiveQuery(
     () => db.expenses.where('date').between(monthStart, monthEnd, true, true).reverse().toArray(),
@@ -53,13 +64,10 @@ export default function ExpensesView() {
     [filterMonth]
   ) ?? [];
 
-  // Find savings goal for this month
-  const savingsGoal = budgets.find(b => b.category === '_savings_goal');
-
   // Aggregations
   const totalExpense = transactions.filter(e => e.type === 'expense').reduce((s, e) => s + e.amount, 0);
   const totalIncome  = transactions.filter(e => e.type === 'income').reduce((s, e) => s + e.amount, 0);
-  const savings      = totalIncome - totalExpense;
+  const balance      = totalIncome - totalExpense;
 
   const byCategory = useMemo(() => {
     const map = {};
@@ -78,21 +86,13 @@ export default function ExpensesView() {
     await db.expenses.delete(id);
   }
 
-  async function setSavingsGoal(amount) {
-    if (savingsGoal) {
-      await db.budgets.update(savingsGoal.id, { amount });
-    } else {
-      await db.budgets.add({ category: '_savings_goal', amount, month: filterMonth });
-    }
-  }
-
   return (
     <div className="expenses-view">
       {/* ═══ Header ═══ */}
       <header className="expenses-header">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-text tracking-tight">Expenses</h1>
-          <div className="flex gap-2">
+          <div className="expenses-header__actions">
             <button onClick={() => setShowModal('income')}
               className="expenses-add-btn expenses-add-btn--income">
               <ArrowUpCircle className="w-4 h-4" />
@@ -106,149 +106,171 @@ export default function ExpensesView() {
           </div>
         </div>
 
-        {/* Month selector */}
-        <input
-          type="month"
-          value={filterMonth}
-          onChange={e => setFilterMonth(e.target.value)}
-          className="modal-input text-sm mt-3 w-full"
-        />
+        {/* Month/Year toggle + Navigation */}
+        <div className="expenses-nav-row">
+          <div className="expenses-tab-toggle">
+            <button
+              className={`expenses-tab ${viewTab === 'month' ? 'expenses-tab--active' : ''}`}
+              onClick={() => setViewTab('month')}
+            >Month</button>
+            <button
+              className={`expenses-tab ${viewTab === 'year' ? 'expenses-tab--active' : ''}`}
+              onClick={() => setViewTab('year')}
+            >Year</button>
+          </div>
+          <div className="expenses-month-nav">
+            <button className="expenses-month-nav__arrow" onClick={prevMonth}>
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="expenses-month-nav__label">{monthLabel}</span>
+            <button className="expenses-month-nav__arrow" onClick={nextMonth}>
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
       </header>
 
-      {/* ═══ Savings Card ═══ */}
-      <div className="expenses-savings-card">
-        <div className="expenses-savings-top">
-          <div className="flex items-center gap-2">
-            <PiggyBank className="w-5 h-5 text-accent" />
-            <span className="text-xs font-bold uppercase tracking-wider text-text-muted">Monthly Savings</span>
-          </div>
-          <span className={`text-xl font-bold ${savings >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-            {savings >= 0 ? '+' : ''}{fmtIQD(savings)}
-          </span>
-        </div>
-        {/* Savings goal */}
-        <div className="expenses-savings-goal">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-text-muted font-semibold">
-              <Target className="w-3 h-3 inline mr-1" />
-              Goal: {savingsGoal ? fmtIQD(savingsGoal.amount) : 'Not set'}
-            </span>
-            {savingsGoal && (
-              <span className={`font-bold ${savings >= savingsGoal.amount ? 'text-emerald-500' : 'text-accent'}`}>
-                {Math.min(100, Math.round((savings / savingsGoal.amount) * 100))}%
+      {viewTab === 'month' ? (
+        <>
+          {/* ═══ Balance Card ═══ */}
+          <div className="expenses-balance-card">
+            <div className="expenses-balance-card__top">
+              <div className="flex items-center gap-2">
+                <Wallet className="w-5 h-5 text-accent" />
+                <span className="text-xs font-bold uppercase tracking-wider text-text-muted">Monthly Balance</span>
+              </div>
+              <span className={`text-xl font-bold ${balance >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                {balance >= 0 ? '+' : ''}{fmtIQD(balance)}
               </span>
-            )}
+            </div>
+            <div className="expenses-balance-card__bar">
+              <div className="expenses-balance-card__income-bar"
+                style={{ width: totalIncome > 0 ? '100%' : '0' }} />
+              <div className="expenses-balance-card__expense-bar"
+                style={{ width: totalIncome > 0 ? `${Math.min(100, (totalExpense / totalIncome) * 100)}%` : '0' }} />
+            </div>
+            <div className="expenses-balance-card__legend">
+              <span className="expenses-balance-card__legend-item">
+                <span className="expenses-balance-card__legend-dot expenses-balance-card__legend-dot--income" />
+                Income: {fmtIQD(totalIncome)}
+              </span>
+              <span className="expenses-balance-card__legend-item">
+                <span className="expenses-balance-card__legend-dot expenses-balance-card__legend-dot--expense" />
+                Spent: {fmtIQD(totalExpense)}
+              </span>
+            </div>
           </div>
-          {savingsGoal && (
-            <div className="expenses-savings-bar">
-              <div className="expenses-savings-fill"
-                style={{ width: `${Math.min(100, Math.max(0, (savings / savingsGoal.amount) * 100))}%` }} />
+
+          {/* ═══ Summary Cards ═══ */}
+          <div className="expenses-summary">
+            <div className="expense-summary-card expense-summary-card--expense">
+              <ArrowDownCircle className="w-5 h-5 text-red-500" />
+              <div>
+                <p className="text-xs text-text-muted font-semibold">Expenses</p>
+                <p className="text-lg font-bold text-text">{fmtIQD(totalExpense)}</p>
+              </div>
+            </div>
+            <div className="expense-summary-card expense-summary-card--income">
+              <ArrowUpCircle className="w-5 h-5 text-emerald-500" />
+              <div>
+                <p className="text-xs text-text-muted font-semibold">Income</p>
+                <p className="text-lg font-bold text-text">{fmtIQD(totalIncome)}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* ═══ Category Breakdown with progress bars ═══ */}
+          {Object.keys(byCategory).length > 0 && (
+            <div className="expenses-breakdown">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-text-muted mb-3">By Category</h3>
+              <div className="flex flex-col gap-1.5">
+                {EXPENSE_CATEGORIES.filter(c => byCategory[c.id]).map(cat => {
+                  const amount = byCategory[cat.id] || 0;
+                  const pct = totalExpense > 0 ? (amount / totalExpense) * 100 : 0;
+                  const budget = budgets.find(b => b.category === cat.id);
+                  const CatIcon = cat.icon;
+                  return (
+                    <div key={cat.id} className="expense-category-row">
+                      <div className="expense-category-row__left">
+                        <div className="expense-category-row__icon" style={{ backgroundColor: cat.color + '18' }}>
+                          <CatIcon className="w-3.5 h-3.5" style={{ color: cat.color }} />
+                        </div>
+                        <div className="expense-category-row__info">
+                          <span className="expense-category-row__name">{cat.label}</span>
+                          <div className="expense-category-row__bar-wrap">
+                            <div className="expense-category-row__bar"
+                              style={{ width: `${pct}%`, backgroundColor: cat.color }} />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="expense-category-row__right">
+                        <span className="expense-category-row__amount">{fmtIQD(amount)}</span>
+                        <span className="expense-category-row__pct">{pct.toFixed(0)}%</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
-          <button onClick={() => {
-            const val = prompt('Set savings goal (IQD):', savingsGoal?.amount || '');
-            const num = parseInt(val);
-            if (num > 0) setSavingsGoal(num);
-          }} className="text-[10px] text-accent font-semibold mt-1 hover:underline cursor-pointer">
-            {savingsGoal ? 'Change Goal' : 'Set Goal'}
-          </button>
-        </div>
-      </div>
 
-      {/* ═══ Summary Cards ═══ */}
-      <div className="expenses-summary">
-        <div className="expense-summary-card expense-summary-card--expense">
-          <ArrowDownCircle className="w-5 h-5 text-red-500" />
-          <div>
-            <p className="text-xs text-text-muted font-semibold">Expenses</p>
-            <p className="text-lg font-bold text-text">{fmtIQD(totalExpense)}</p>
+          {/* ═══ Monthly Report Button ═══ */}
+          <div className="expenses-report-row">
+            <button
+              className="expenses-report-btn"
+              onClick={() => onNavigate?.('chat')}
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>AI Monthly Report</span>
+            </button>
           </div>
-        </div>
-        <div className="expense-summary-card expense-summary-card--income">
-          <ArrowUpCircle className="w-5 h-5 text-emerald-500" />
-          <div>
-            <p className="text-xs text-text-muted font-semibold">Income</p>
-            <p className="text-lg font-bold text-text">{fmtIQD(totalIncome)}</p>
-          </div>
-        </div>
-      </div>
 
-      {/* ═══ Category Breakdown ═══ */}
-      {Object.keys(byCategory).length > 0 && (
-        <div className="expenses-breakdown">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-text-muted mb-3">By Category</h3>
-          <div className="flex flex-col gap-2">
-            {EXPENSE_CATEGORIES.filter(c => byCategory[c.id]).map(cat => {
-              const amount = byCategory[cat.id] || 0;
-              const pct = totalExpense > 0 ? (amount / totalExpense) * 100 : 0;
-              const budget = budgets.find(b => b.category === cat.id);
-              const CatIcon = cat.icon;
-              return (
-                <div key={cat.id} className="expense-category-row">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                         style={{ backgroundColor: cat.color + '18' }}>
-                      <CatIcon className="w-4 h-4" style={{ color: cat.color }} />
+          {/* ═══ Transaction List ═══ */}
+          <div className="expenses-list">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-text-muted mb-3">Transactions</h3>
+            {transactions.length === 0 ? (
+              <div className="expenses-list-empty">
+                <span className="expenses-list-empty__icon">💳</span>
+                <p className="expenses-list-empty__title">No transactions this month</p>
+                <p className="expenses-list-empty__sub">Tap Income or Expense to get started</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                {transactions.map(exp => {
+                  const isIncome = exp.type === 'income';
+                  const source = isIncome ? INCOME_SOURCES.find(s => s.id === exp.category) : null;
+                  const cat = isIncome
+                    ? { icon: source?.icon || DollarSign, color: '#10b981', label: source?.label || 'Income' }
+                    : EXPENSE_CATEGORIES.find(c => c.id === exp.category) || EXPENSE_CATEGORIES.at(-1);
+                  const CatIcon = cat.icon;
+                  return (
+                    <div key={exp.id} className="expense-item">
+                      <div className="expense-item__icon" style={{ backgroundColor: cat.color + '18' }}>
+                        <CatIcon className="w-4 h-4" style={{ color: cat.color }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-text truncate">{exp.note || cat.label}</p>
+                        <p className="text-[10px] text-text-muted">{format(new Date(exp.date), 'MMM d')}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-sm font-bold ${isIncome ? 'text-emerald-500' : 'text-text'}`}>
+                          {isIncome ? '+' : '-'}{fmtIQD(exp.amount)}
+                        </span>
+                        <button onClick={() => deleteTransaction(exp.id)} className="expense-item__delete">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-text truncate">{cat.label}</p>
-                      {budget && (
-                        <p className="text-[10px] text-text-muted">{fmtIQD(amount)} / {fmtIQD(budget.amount)} budget</p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-sm font-bold text-text">{fmtIQD(amount)}</p>
-                    <p className="text-[10px] text-text-muted">{pct.toFixed(0)}%</p>
-                  </div>
-                </div>
-              );
-            })}
+                  );
+                })}
+              </div>
+            )}
           </div>
-        </div>
+        </>
+      ) : (
+        /* ═══ Year Overview ═══ */
+        <YearOverview year={monthDate.getFullYear()} />
       )}
-
-      {/* ═══ Transaction List ═══ */}
-      <div className="expenses-list">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-text-muted mb-3">Transactions</h3>
-        {transactions.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-text-muted/40">
-            <Wallet className="w-12 h-12 mb-3" />
-            <p className="text-sm font-medium">No transactions this month</p>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {transactions.map(exp => {
-              const isIncome = exp.type === 'income';
-              const source = isIncome ? INCOME_SOURCES.find(s => s.id === exp.category) : null;
-              const cat = isIncome
-                ? { icon: source?.icon || DollarSign, color: '#10b981', label: source?.label || 'Income' }
-                : EXPENSE_CATEGORIES.find(c => c.id === exp.category) || EXPENSE_CATEGORIES.at(-1);
-              const CatIcon = cat.icon;
-              return (
-                <div key={exp.id} className="expense-item">
-                  <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-                       style={{ backgroundColor: cat.color + '18' }}>
-                    <CatIcon className="w-4 h-4" style={{ color: cat.color }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-text truncate">{exp.note || cat.label}</p>
-                    <p className="text-[10px] text-text-muted">{exp.date}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`text-sm font-bold ${isIncome ? 'text-emerald-500' : 'text-text'}`}>
-                      {isIncome ? '+' : '-'}{fmtIQD(exp.amount)}
-                    </span>
-                    <button onClick={() => deleteTransaction(exp.id)} className="p-1 text-text-muted/30 hover:text-red-500 transition-colors">
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
 
       {/* ═══ Modals ═══ */}
       {showModal === 'expense' && (
@@ -257,6 +279,79 @@ export default function ExpensesView() {
       {showModal === 'income' && (
         <AddIncomeModal onSave={addTransaction} onClose={() => setShowModal(null)} />
       )}
+    </div>
+  );
+}
+
+/* ────── Year Overview Chart ────── */
+function YearOverview({ year }) {
+  const yearStart = `${year}-01-01`;
+  const yearEnd   = `${year}-12-31`;
+
+  const allTransactions = useLiveQuery(
+    () => db.expenses.where('date').between(yearStart, yearEnd, true, true).toArray(),
+    [yearStart, yearEnd]
+  ) ?? [];
+
+  const months = eachMonthOfInterval({
+    start: new Date(year, 0, 1),
+    end: new Date(year, 11, 31),
+  });
+
+  const monthlyData = months.map(m => {
+    const key = format(m, 'yyyy-MM');
+    const monthTxns = allTransactions.filter(t => t.date?.startsWith(key));
+    const income  = monthTxns.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+    const expense = monthTxns.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+    return { month: format(m, 'MMM'), income, expense };
+  });
+
+  const maxVal = Math.max(1, ...monthlyData.map(d => Math.max(d.income, d.expense)));
+
+  const totalIncome  = monthlyData.reduce((s, d) => s + d.income, 0);
+  const totalExpense = monthlyData.reduce((s, d) => s + d.expense, 0);
+
+  return (
+    <div className="year-overview">
+      <h3 className="year-overview__title">{year} Overview</h3>
+
+      <div className="year-overview__summary">
+        <div className="year-overview__stat year-overview__stat--income">
+          <span className="year-overview__stat-label">Total Income</span>
+          <span className="year-overview__stat-value">{fmtIQD(totalIncome)}</span>
+        </div>
+        <div className="year-overview__stat year-overview__stat--expense">
+          <span className="year-overview__stat-label">Total Expenses</span>
+          <span className="year-overview__stat-value">{fmtIQD(totalExpense)}</span>
+        </div>
+      </div>
+
+      <div className="year-chart">
+        {monthlyData.map((d, i) => (
+          <div key={i} className="year-chart__col">
+            <div className="year-chart__bars">
+              <div className="year-chart__bar year-chart__bar--income"
+                style={{ height: `${(d.income / maxVal) * 100}%` }}
+                title={`Income: ${fmtIQD(d.income)}`} />
+              <div className="year-chart__bar year-chart__bar--expense"
+                style={{ height: `${(d.expense / maxVal) * 100}%` }}
+                title={`Expenses: ${fmtIQD(d.expense)}`} />
+            </div>
+            <span className="year-chart__label">{d.month}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="year-chart__legend">
+        <span className="year-chart__legend-item">
+          <span className="year-chart__legend-dot year-chart__legend-dot--income" />
+          Income
+        </span>
+        <span className="year-chart__legend-item">
+          <span className="year-chart__legend-dot year-chart__legend-dot--expense" />
+          Expenses
+        </span>
+      </div>
     </div>
   );
 }
@@ -277,7 +372,7 @@ function AddExpenseModal({ onSave, onClose }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()}>
+      <div className="modal-content modal-content--wide" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-text">💸 Log Expense</h2>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-surface-elevated transition-colors">
@@ -285,13 +380,13 @@ function AddExpenseModal({ onSave, onClose }) {
           </button>
         </div>
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          <div className="relative">
+          <div className="expense-amount-wrap">
             <input
               autoFocus type="number" min="0" placeholder="Amount"
               value={amount} onChange={e => setAmount(e.target.value)}
-              className="modal-input text-2xl font-bold text-center pr-16"
+              className="modal-input modal-input--amount"
             />
-            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted text-sm font-semibold">IQD</span>
+            <span className="expense-amount-wrap__currency">IQD</span>
           </div>
 
           {/* Category grid */}
@@ -302,10 +397,9 @@ function AddExpenseModal({ onSave, onClose }) {
                 const CIcon = c.icon;
                 return (
                   <button key={c.id} type="button" onClick={() => setCategory(c.id)}
-                    className={`flex flex-col items-center gap-1 py-2 px-1 rounded-xl text-xs font-medium transition-all
-                      ${category === c.id ? 'ring-2 ring-accent bg-accent/10' : 'bg-surface hover:bg-surface-elevated'}`}>
+                    className={`expense-cat-btn ${category === c.id ? 'expense-cat-btn--active' : ''}`}>
                     <CIcon className="w-4 h-4" style={{ color: c.color }} />
-                    <span className="text-text truncate text-[10px]">{c.label}</span>
+                    <span>{c.label}</span>
                   </button>
                 );
               })}
@@ -315,8 +409,7 @@ function AddExpenseModal({ onSave, onClose }) {
           <input type="text" placeholder="Note (optional)" value={note} onChange={e => setNote(e.target.value)} className="modal-input" />
           <input type="date" value={date} onChange={e => setDate(e.target.value)} className="modal-input text-sm" />
 
-          <button type="submit"
-            className="w-full py-3 rounded-xl bg-red-500 text-white font-semibold text-sm hover:opacity-90 transition-all mt-1">
+          <button type="submit" className="expense-submit-btn expense-submit-btn--expense">
             Log Expense
           </button>
         </form>
@@ -341,7 +434,7 @@ function AddIncomeModal({ onSave, onClose }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()}>
+      <div className="modal-content modal-content--wide" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-text">💰 Log Income</h2>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-surface-elevated transition-colors">
@@ -349,13 +442,13 @@ function AddIncomeModal({ onSave, onClose }) {
           </button>
         </div>
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          <div className="relative">
+          <div className="expense-amount-wrap">
             <input
               autoFocus type="number" min="0" placeholder="Amount"
               value={amount} onChange={e => setAmount(e.target.value)}
-              className="modal-input text-2xl font-bold text-center pr-16"
+              className="modal-input modal-input--amount"
             />
-            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted text-sm font-semibold">IQD</span>
+            <span className="expense-amount-wrap__currency">IQD</span>
           </div>
 
           {/* Source selector */}
@@ -366,8 +459,7 @@ function AddIncomeModal({ onSave, onClose }) {
                 const SIcon = s.icon;
                 return (
                   <button key={s.id} type="button" onClick={() => setSource(s.id)}
-                    className={`flex items-center gap-2 py-2.5 px-3 rounded-xl text-sm font-medium transition-all
-                      ${source === s.id ? 'ring-2 ring-emerald-500 bg-emerald-500/10 text-emerald-600' : 'bg-surface hover:bg-surface-elevated text-text'}`}>
+                    className={`expense-source-btn ${source === s.id ? 'expense-source-btn--active' : ''}`}>
                     <SIcon className="w-4 h-4" />
                     <span>{s.label}</span>
                   </button>
@@ -379,8 +471,7 @@ function AddIncomeModal({ onSave, onClose }) {
           <input type="text" placeholder="Note (optional)" value={note} onChange={e => setNote(e.target.value)} className="modal-input" />
           <input type="date" value={date} onChange={e => setDate(e.target.value)} className="modal-input text-sm" />
 
-          <button type="submit"
-            className="w-full py-3 rounded-xl bg-emerald-500 text-white font-semibold text-sm hover:opacity-90 transition-all mt-1">
+          <button type="submit" className="expense-submit-btn expense-submit-btn--income">
             Log Income
           </button>
         </form>

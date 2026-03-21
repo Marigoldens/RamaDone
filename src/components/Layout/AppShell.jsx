@@ -47,7 +47,7 @@ export default function AppShell({ user, accessToken, onSignIn, onSignOut }) {
           />
         )}
         {activeTab === 'expenses' && (
-          <ExpensesView />
+          <ExpensesView onNavigate={setActiveTab} />
         )}
         {activeTab === 'habits' && (
           <HabitsView />

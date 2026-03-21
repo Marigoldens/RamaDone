@@ -146,6 +146,12 @@ export default function TasksView({ prefilledDate, onPrefilledDateUsed }) {
 
 /* ────── Kanban Board ────── */
 function KanbanBoard({ tasks, onToggle, onEdit, onDelete }) {
+  const EMPTY_MESSAGES = {
+    todo: 'All clear! Add a task to get started.',
+    'in-progress': 'Nothing in progress right now.',
+    done: 'Complete a task to see it here! ✨',
+  };
+
   return (
     <div className="kanban-board">
       {STATUSES.map(status => {
@@ -156,14 +162,19 @@ function KanbanBoard({ tasks, onToggle, onEdit, onDelete }) {
               <span className="text-xs font-bold uppercase tracking-wider text-text-muted">
                 {STATUS_LABELS[status]}
               </span>
-              <span className="text-xs text-text-muted/60 font-mono">{columnTasks.length}</span>
+              <span className="kanban-column__count">{columnTasks.length}</span>
             </div>
             <div className="kanban-column__body">
               {columnTasks.map(task => (
                 <TaskCard key={task.id} task={task} onToggle={onToggle} onEdit={onEdit} onDelete={onDelete} />
               ))}
               {columnTasks.length === 0 && (
-                <p className="text-xs text-text-muted/40 text-center py-8">No tasks</p>
+                <div className="kanban-empty">
+                  <div className="kanban-empty__icon">
+                    {status === 'done' ? '🎉' : status === 'in-progress' ? '⏳' : '📋'}
+                  </div>
+                  <p className="kanban-empty__text">{EMPTY_MESSAGES[status]}</p>
+                </div>
               )}
             </div>
           </div>
@@ -231,9 +242,10 @@ function TaskListView({ tasks, onToggle, onEdit, onDelete }) {
   return (
     <div className="task-list">
       {tasks.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-text-muted/40">
-          <CheckCircle2 className="w-12 h-12 mb-3" />
-          <p className="text-sm font-medium">No tasks yet</p>
+        <div className="task-list-empty">
+          <span className="task-list-empty__icon">📋</span>
+          <p className="task-list-empty__title">No tasks yet</p>
+          <p className="task-list-empty__sub">Tap + to create your first task</p>
         </div>
       ) : (
         tasks.map(task => (
@@ -260,7 +272,7 @@ function AddTaskModal({ task, initialDate, onSave, onClose }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()}>
+      <div className="modal-content modal-content--wide" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-text">{task ? 'Edit Task' : 'New Task'}</h2>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-surface-elevated transition-colors">
@@ -274,13 +286,13 @@ function AddTaskModal({ task, initialDate, onSave, onClose }) {
             placeholder="Task title..."
             value={title}
             onChange={e => setTitle(e.target.value)}
-            className="modal-input"
+            className="modal-input modal-input--lg"
           />
           <textarea
             placeholder="Description (optional)"
             value={description}
             onChange={e => setDesc(e.target.value)}
-            rows={2}
+            rows={3}
             className="modal-input resize-none"
           />
           <div className="grid grid-cols-2 gap-3">
@@ -307,7 +319,7 @@ function AddTaskModal({ task, initialDate, onSave, onClose }) {
           />
           <button
             type="submit"
-            className="w-full py-3 rounded-xl bg-accent text-white font-semibold text-sm hover:opacity-90 transition-all mt-1"
+            className="task-submit-btn"
           >
             {task ? 'Save Changes' : 'Add Task'}
           </button>

@@ -8,7 +8,7 @@
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.25rem;
 }
 
 .dashboard-header {
@@ -25,6 +25,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: background 0.2s;
+  cursor: pointer;
+}
+.dashboard-header__icon:hover {
+  background: color-mix(in srgb, var(--c-accent) 22%, transparent);
 }
 
 /* ── Quick action buttons ── */
@@ -66,18 +71,28 @@
   }
 }
 
+/* ── Widget card base ── */
 .dashboard-widget {
   background-color: var(--c-surface-elevated);
   border: 1px solid var(--c-border);
   border-radius: 16px;
-  padding: 1rem;
+  padding: 0.875rem 1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.5rem;
   text-align: left;
   cursor: pointer;
   transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
 }
+
+/* Left accent border per widget type */
+.dashboard-widget--tasks    { border-left: 3px solid #3b82f6; }
+.dashboard-widget--expenses { border-left: 3px solid #10b981; }
+.dashboard-widget--habits   { border-left: 3px solid #8b5cf6; }
+.dashboard-widget--calendar { border-left: 3px solid var(--c-accent); }
+
 .dashboard-widget:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
@@ -90,6 +105,29 @@
   gap: 0.5rem;
 }
 
+/* Icon background circle */
+.dashboard-widget__icon-wrap {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.dashboard-widget__icon-wrap--blue   { background: rgba(59, 130, 246, 0.12); color: #3b82f6; }
+.dashboard-widget__icon-wrap--green  { background: rgba(16, 185, 129, 0.12); color: #10b981; }
+.dashboard-widget__icon-wrap--purple { background: rgba(139, 92, 246, 0.12); color: #8b5cf6; }
+.dashboard-widget__icon-wrap--gold   { background: color-mix(in srgb, var(--c-accent) 12%, transparent); color: var(--c-accent); }
+
+.dashboard-widget__label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--c-text-muted);
+}
+
 .dashboard-widget__body {
   display: flex;
   flex-direction: column;
@@ -97,36 +135,56 @@
 }
 
 .dashboard-widget__number {
-  font-size: 1.75rem;
+  font-size: 1.5rem;
   font-weight: 800;
   color: var(--c-text);
-  line-height: 1;
+  line-height: 1.1;
+}
+
+.dashboard-widget__subtitle {
+  font-size: 11px;
+  color: var(--c-text-muted);
 }
 
 .dashboard-widget__footer {
   margin-top: auto;
+  padding-top: 0.25rem;
 }
 
+.dashboard-widget__stat-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Income badge */
+.dashboard-widget__income-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  font-size: 10px;
+  font-weight: 600;
+  width: fit-content;
+}
+
+/* Progress bar */
 .dashboard-widget__progress-bar {
   height: 4px;
   border-radius: 999px;
   background-color: var(--c-border);
   overflow: hidden;
+  margin-top: 2px;
 }
 
 .dashboard-widget__progress-fill {
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--c-accent), var(--c-primary));
+  background: linear-gradient(90deg, #8b5cf6, #a78bfa);
   transition: width 0.5s ease;
-}
-
-/* ── Toggle panel ── */
-.dashboard-toggle-panel {
-  padding: 0.75rem 1rem;
-  border-radius: 14px;
-  background-color: var(--c-surface-elevated);
-  border: 1px solid var(--c-border);
 }
 
 /* ── Detail list inside widgets ── */
@@ -139,7 +197,170 @@
 .dashboard-widget__detail-item {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   overflow: hidden;
 }
 
+/* Status dot for task items */
+.dashboard-widget__detail-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #3b82f6;
+  flex-shrink: 0;
+}
+.dashboard-widget__detail-dot--done {
+  background: var(--c-text-muted);
+}
+
+/* ═══════════════════════════════════════════
+   SETTINGS MODAL
+   ═══════════════════════════════════════════ */
+
+.dash-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 1rem;
+  animation: dashFadeIn 0.2s ease;
+}
+
+@keyframes dashFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.dash-modal {
+  background-color: var(--c-surface-elevated);
+  border: 1px solid var(--c-border);
+  border-radius: 20px;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 380px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18);
+  animation: dashSlideUp 0.25s ease;
+}
+
+@keyframes dashSlideUp {
+  from { opacity: 0; transform: translateY(20px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.dash-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.25rem;
+}
+
+.dash-modal__close {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--c-text-muted);
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.dash-modal__close:hover {
+  background: color-mix(in srgb, var(--c-text) 8%, transparent);
+}
+
+.dash-modal__toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Toggle row — label + switch */
+.dash-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.625rem 0.75rem;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--c-text) 3%, transparent);
+  border: 1px solid var(--c-border);
+}
+
+.dash-toggle-row__info {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+/* Toggle switch */
+.dash-toggle-switch {
+  position: relative;
+  width: 42px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--c-border);
+  border: none;
+  cursor: pointer;
+  transition: background 0.25s ease;
+  flex-shrink: 0;
+}
+.dash-toggle-switch--on {
+  background: var(--c-accent);
+}
+
+.dash-toggle-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: white;
+  transition: transform 0.25s ease;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+.dash-toggle-switch--on .dash-toggle-knob {
+  transform: translateX(18px);
+}
+
+/* ═══════════════════════════════════════════
+   AI CHAT FAB (floating action button)
+   ═══════════════════════════════════════════ */
+
+.dashboard-ai-fab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--c-accent), color-mix(in srgb, var(--c-accent) 80%, #fff));
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--c-accent) 35%, transparent);
+  transition: all 0.25s ease;
+  margin-top: auto;
+  align-self: center;
+}
+.dashboard-ai-fab:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px color-mix(in srgb, var(--c-accent) 45%, transparent);
+}
+
+.dashboard-ai-fab__sparkle {
+  animation: dashSparkle 2s ease-in-out infinite;
+}
+
+@keyframes dashSparkle {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50%      { opacity: 1;   transform: scale(1.15); }
+}

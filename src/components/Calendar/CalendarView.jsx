@@ -186,7 +186,7 @@ export default function CalendarView({ accessToken, onSignIn, onNavigate, onAddT
 
       {/* Choice popup: Add Event vs Add Task */}
       {showChoice && (
-        <div className="modal-overlay" onClick={() => setShowChoice(null)}>
+        <div className="cal-choice-overlay" onClick={() => setShowChoice(null)}>
           <div className="cal-choice-popup" onClick={e => e.stopPropagation()}>
             <p className="text-sm font-bold text-text mb-3">What would you like to add?</p>
             <div className="flex gap-3">
