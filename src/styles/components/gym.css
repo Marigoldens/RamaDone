@@ -1,0 +1,746 @@
+/* ===================================================
+   GYM TRACKER — Premium Styles
+   =================================================== */
+
+.gym-view {
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  /* Add subtle background glow */
+  background: radial-gradient(circle at 50% -20%, rgba(139, 92, 246, 0.1) 0%, transparent 60%);
+}
+
+/* ── Header ── */
+.gym-header {
+  padding: 32px 24px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: relative;
+  z-index: 10;
+}
+
+.gym-header__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.gym-header__title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--c-text);
+  letter-spacing: -0.03em;
+  background: linear-gradient(135deg, #fff 0%, rgba(255, 255, 255, 0.7) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.gym-header__add-btn {
+  padding: 10px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--c-accent), #ec4899);
+  color: white;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.gym-header__add-btn:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 8px 24px rgba(139, 92, 246, 0.4), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.gym-header__add-btn:active {
+  transform: translateY(0) scale(0.95);
+}
+
+/* ── Tab bar ── */
+.gym-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  margin: 20px 24px 0;
+  background: rgba(20, 20, 20, 0.5);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  position: sticky;
+  top: 16px;
+  z-index: 20;
+}
+
+.gym-tab-btn {
+  flex: 1;
+  padding: 12px 8px;
+  border-radius: 12px;
+  border: none;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--c-text-muted);
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  position: relative;
+  overflow: hidden;
+}
+
+.gym-tab-btn:hover {
+  color: var(--c-text);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.gym-tab-btn--active {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ── Content area ── */
+.gym-content {
+  padding: 24px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  z-index: 10;
+}
+
+/* ── Empty state ── */
+.gym-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  color: var(--c-text-muted);
+  opacity: 0.6;
+  text-align: center;
+  background: rgba(20, 20, 20, 0.3);
+  border-radius: 24px;
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+}
+.gym-empty__icon {
+  width: 56px;
+  height: 56px;
+  margin-bottom: 16px;
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5));
+  opacity: 0.7;
+}
+.gym-empty__text {
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+
+/* ── Plan card ── */
+.gym-plan-card {
+  background: rgba(20, 20, 20, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  position: relative;
+  overflow: hidden;
+}
+
+.gym-plan-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(circle at top right, rgba(139, 92, 246, 0.1), transparent 50%);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+
+.gym-plan-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(139, 92, 246, 0.4);
+  box-shadow: 0 16px 48px rgba(139, 92, 246, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.gym-plan-card:hover::before {
+  opacity: 1;
+}
+
+.gym-plan-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  z-index: 1;
+}
+
+.gym-plan-card__name {
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: var(--c-text);
+  letter-spacing: -0.01em;
+}
+
+.gym-plan-card__type {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(6, 182, 212, 0.2));
+  color: #c4b5fd;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.2);
+}
+
+.gym-plan-card__exercises {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+  z-index: 1;
+}
+
+.gym-plan-card__exercise {
+  font-size: 0.875rem;
+  color: var(--c-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 500;
+}
+.gym-plan-card__exercise::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--c-accent);
+  flex-shrink: 0;
+  box-shadow: 0 0 8px var(--c-accent);
+}
+
+.gym-plan-card__actions {
+  display: flex;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  position: relative;
+  z-index: 1;
+}
+
+.gym-plan-card__action-btn {
+  flex: 1;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--c-text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.3s ease;
+}
+.gym-plan-card__action-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.gym-plan-card__action-btn--start {
+  background: linear-gradient(135deg, var(--c-accent), #7c3aed);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+.gym-plan-card__action-btn--start:hover {
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(139, 92, 246, 0.4);
+}
+.gym-plan-card__action-btn--danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+
+/* ── Active workout session ── */
+.gym-active-session {
+  background: rgba(20, 20, 20, 0.7);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(139, 92, 246, 0.5);
+  border-radius: 24px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-shadow: 0 12px 48px rgba(139, 92, 246, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.gym-active-session::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 150px;
+  background: linear-gradient(to bottom, rgba(139, 92, 246, 0.15), transparent);
+  pointer-events: none;
+}
+
+.gym-active-session__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+  z-index: 1;
+}
+
+.gym-active-session__title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--c-text);
+  letter-spacing: -0.02em;
+}
+
+.gym-exercise-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: relative;
+  z-index: 1;
+}
+
+.gym-exercise-item {
+  background: rgba(10, 10, 10, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.gym-exercise-item__name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--c-text);
+  letter-spacing: -0.01em;
+}
+
+/* ── Set rows ── */
+.gym-set-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gym-set-row {
+  display: grid;
+  grid-template-columns: 32px 1fr 1fr 40px;
+  align-items: center;
+  gap: 8px;
+}
+
+.gym-set-row--header {
+  padding: 0 4px;
+  margin-bottom: 4px;
+}
+.gym-set-row--header span {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: center;
+}
+
+.gym-set-row__num {
+  font-size: 0.875rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.3);
+  text-align: center;
+}
+
+.gym-set-row__field {
+  text-align: center;
+}
+
+.gym-set-row__done-hd {
+  text-align: center;
+}
+
+/* ── Weight / reps stepper ── */
+.gym-stepper {
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  overflow: hidden;
+  height: 40px;
+  transition: all 0.2s ease;
+}
+
+.gym-stepper:focus-within {
+  border-color: rgba(139, 92, 246, 0.5);
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
+}
+
+.gym-stepper__btn {
+  flex-shrink: 0;
+  width: 40px;
+  height: 100%;
+  border: none;
+  background: rgba(255, 255, 255, 0.02);
+  color: #c4b5fd;
+  font-size: 0.875rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.gym-stepper__btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+.gym-stepper__btn:active {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.gym-stepper__input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  color: var(--c-text);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  text-align: center;
+  padding: 0 4px;
+  height: 100%;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.gym-stepper__input::-webkit-outer-spin-button,
+.gym-stepper__input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+}
+.gym-stepper__input:focus {
+  outline: none;
+  background: rgba(139, 92, 246, 0.1);
+}
+
+.gym-stepper--reps .gym-stepper__btn {
+  width: 32px;
+  font-size: 1.125rem;
+}
+
+.gym-set-check {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  background: rgba(20, 20, 20, 0.5);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+.gym-set-check:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+}
+.gym-set-check--done {
+  background: linear-gradient(135deg, var(--c-accent), #3b82f6);
+  border-color: transparent;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+}
+.gym-set-check--done:hover {
+  transform: scale(1.05);
+}
+
+.gym-add-set-btn {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  padding: 10px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--c-text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+.gym-add-set-btn:hover {
+  border-color: var(--c-accent);
+  color: var(--c-accent);
+  background: rgba(139, 92, 246, 0.05);
+}
+
+.gym-session-actions {
+  display: flex;
+  gap: 12px;
+  position: relative;
+  z-index: 1;
+}
+.gym-finish-btn {
+  flex: 1;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: linear-gradient(135deg, var(--c-accent), #7c3aed);
+  color: white;
+  font-size: 0.9375rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 8px 24px rgba(139, 92, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  width: 100%;
+}
+.gym-finish-btn:hover { 
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(139, 92, 246, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+.gym-finish-btn:active {
+  transform: translateY(0);
+}
+
+.gym-cancel-btn {
+  padding: 14px 20px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--c-text);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.gym-cancel-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+
+/* ── History log card ── */
+.gym-log-card {
+  background: rgba(20, 20, 20, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all 0.3s ease;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  position: relative;
+  overflow: hidden;
+}
+.gym-log-card:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.gym-log-card::after {
+  content: '';
+  position: absolute;
+  top: 0; right: 0; bottom: 0; left: 0;
+  background: linear-gradient(135deg, transparent, rgba(255, 255, 255, 0.03));
+  pointer-events: none;
+}
+
+.gym-log-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  z-index: 1;
+}
+
+.gym-log-card__date {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--c-text);
+}
+
+.gym-log-card__duration {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #c4b5fd;
+}
+
+.gym-log-card__plan {
+  font-size: 0.875rem;
+  color: var(--c-text-muted);
+  font-weight: 500;
+  position: relative;
+  z-index: 1;
+}
+
+.gym-log-card__exercises {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+  position: relative;
+  z-index: 1;
+}
+
+.gym-log-card__exercise-pill {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* ── Add Plan Modal extras ── */
+.gym-modal-exercises {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gym-modal-exercise-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.gym-modal-exercise-row input {
+  flex: 1;
+}
+
+.gym-modal-remove-btn {
+  padding: 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  background: rgba(239, 68, 68, 0.1);
+  color: #fca5a5;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+.gym-modal-remove-btn:hover {
+  color: #fff;
+  background: #ef4444;
+  border-color: #ef4444;
+}
+
+/* ── Stats row ── */
+.gym-stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.gym-stat-card {
+  background: rgba(20, 20, 20, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 16px 12px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.gym-stat-card__value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--c-text);
+  text-shadow: 0 2px 10px rgba(255, 255, 255, 0.2);
+}
+
+.gym-stat-card__label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--c-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ── Quick start (no plan workout) ── */
+.gym-quick-start-btn {
+  padding: 16px;
+  border-radius: 16px;
+  border: 2px dashed rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--c-text);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  width: 100%;
+}
+.gym-quick-start-btn:hover {
+  border-color: var(--c-accent);
+  color: white;
+  background: rgba(139, 92, 246, 0.1);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(139, 92, 246, 0.2);
+}
+
+.gym-notes-input {
+  width: 100%;
+  background: rgba(10, 10, 10, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 16px;
+  color: var(--c-text);
+  font-size: 0.875rem;
+  resize: vertical;
+  min-height: 80px;
+  transition: all 0.3s ease;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+.gym-notes-input:focus {
+  outline: none;
+  border-color: var(--c-accent);
+  background: rgba(20, 20, 20, 0.8);
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2), inset 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
