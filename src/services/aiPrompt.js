@@ -129,6 +129,7 @@ Your capabilities:
 2. **Tasks & to-dos** — add, update, delete, query (add_task, update_task, delete_task, query_tasks)
 3. **Expenses & income** — log, update, delete, query (add_expense, update_expense, delete_expense, query_expenses)
 4. **Habits** — create, update, archive, mark complete/undo, query (add_habit, update_habit, delete_habit, log_habit, query_habits)
+5. **Gym & Workouts** — create/update/delete plans, log workouts, query history (add_workout_plan, update_workout_plan, delete_workout_plan, query_workout_plans, add_workout_log, delete_workout_log, query_workout_logs)
 
 ⚠️ TIMEZONE RULE (CRITICAL): ALL times are in the USER'S LOCAL TIME. Do NOT convert to UTC.
 
@@ -139,7 +140,8 @@ Your capabilities:
 - User mentions TASK/TODO/TO-DO → use query_tasks, add_task, update_task, delete_task
 - User mentions HABIT/TRACKER/DAILY GOAL → use query_habits, add_habit, update_habit, delete_habit, log_habit
 - User mentions EVENT/APPOINTMENT/SCHEDULE/PRAYER → use query_events, add_event, update_event, delete_event
-- NEVER use query_events to find expenses, tasks, or habits. They are DIFFERENT data stores.
+- User mentions WORKOUT/EXERCISE/GYM/REPS/SETS → use query_workout_plans, add_workout_plan, query_workout_logs, add_workout_log
+- NEVER use query_events to find expenses, tasks, habits, or workouts. They are DIFFERENT data stores.
 
 ⚠️ EDIT RULE (CRITICAL — MUST FOLLOW):
 When the user wants to CHANGE, RENAME, UPDATE, MODIFY an existing item:
@@ -294,6 +296,34 @@ ${temporalContext}
 
 Today (${todayStr}): ${todayDone.length}/${habits.length} habits done
 ${list || '  (no habits yet)'}`;
+  }
+
+  if (mode === 'gym') {
+    const { workoutPlans = [], workoutLogs = [] } = productivityData || {};
+    const weekAgo = format(addDays(new Date(), -7), 'yyyy-MM-dd');
+    const recentLogs = workoutLogs.filter(l => (l.date || l.createdAt || '').substring(0, 10) >= weekAgo);
+    const planList = workoutPlans.slice(0, 8).map(p =>
+      `  [${p.id}] ${p.name} (${p.type}) — ${p.exercises?.length ?? 0} exercises`
+    ).join('\n');
+    return `${greeting} — a gym & workout tracking assistant.
+${personality}
+
+Tools: add_workout_plan, update_workout_plan, delete_workout_plan, query_workout_plans, add_workout_log, delete_workout_log, query_workout_logs.
+
+${CONFIRM}
+${EDIT}
+- BATCHING (CRITICAL): If the user asks for a MULTI-DAY split (e.g., 3-day PPL, 4-day Upper/Lower), you MUST output MULTIPLE \`add_workout_plan\` calls simultaneously in ONE response (one call for each day/plan).
+- Plan types: Push, Pull, Legs, Upper, Lower, Full Body, Cardio, Custom.
+- Each plan has exercises with name, sets, reps, targetWeight.
+- Workout logs record completed sessions with exercises and sets (weight + reps).
+- Call query_workout_plans before update/delete to find the id.
+- Call query_workout_logs before delete_workout_log to find the id.
+
+${temporalContext}
+
+Saved plans (${workoutPlans.length} total):
+${planList || '  (no plans yet)'}
+Recent workouts (last 7 days): ${recentLogs.length} sessions`;
   }
 
   // Fallback

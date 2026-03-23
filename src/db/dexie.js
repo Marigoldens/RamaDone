@@ -75,4 +75,29 @@ db.version(5).stores({
   notifications: '++id, type, title, body, scheduledAt, fired, relatedId',
 });
 
+/**
+ * Version 7: Gym Tracker
+ * 
+ * NEW TABLES:
+ * - workoutPlans: Saved workout routines/templates
+ * - workoutLogs: Completed workout sessions
+ */
+db.version(7).stores({
+  chatSessions: '++id, title, updatedAt',
+  messages: '++id, sessionId, role, timestamp',
+  events: '++id, googleId, title, start, end, type, date, synced, updatedAt, deleted',
+  preferences: 'key',
+  prayerTimes: 'date',
+  // Productivity Suite tables
+  tasks: '++id, title, status, priority, dueDate, category, createdAt, updatedAt, completed',
+  expenses: '++id, amount, type, category, date, note, recurring, createdAt',
+  budgets: '++id, category, amount, month',
+  habits: '++id, name, emoji, frequency, category, createdAt, archived',
+  habitLogs: '++id, habitId, date, completed, count, note',
+  notifications: '++id, type, title, body, scheduledAt, fired, relatedId',
+  // Gym Tracker
+  workoutPlans: '++id, name, type, createdAt, updatedAt',
+  workoutLogs: '++id, date, planId, duration, createdAt',
+});
+
 export default db;

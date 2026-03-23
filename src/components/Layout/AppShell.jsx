@@ -8,6 +8,7 @@ import DashboardView from '../Dashboard/DashboardView';
 import TasksView from '../Tasks/TasksView';
 import ExpensesView from '../Expenses/ExpensesView';
 import HabitsView from '../Habits/HabitsView';
+import GymView from '../Gym/GymView';
 
 /**
  * Authenticated app shell with persistent navigation.
@@ -51,6 +52,9 @@ export default function AppShell({ user, accessToken, onSignIn, onSignOut }) {
         )}
         {activeTab === 'habits' && (
           <HabitsView />
+        )}
+        {activeTab === 'gym' && (
+          <GymView />
         )}
         {activeTab === 'prayers' && (
           <PrayersView />

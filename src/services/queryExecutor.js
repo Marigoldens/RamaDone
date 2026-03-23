@@ -227,5 +227,41 @@ export function executeProductivityQuery(callName, callArgs, productivityData) {
     return { habits: slimH, logs: slimL, totalLogs: fl.length, truncated: fl.length > 100 };
   }
 
+  // ── Gym queries ───────────────────────────────────────────────────────
+  const { workoutPlans = [], workoutLogs = [] } = productivityData;
+
+  if (callName === 'query_workout_plans') {
+    let fp = workoutPlans;
+    if (callArgs.keyword) fp = fp.filter(p => p.name?.toLowerCase().includes(callArgs.keyword.toLowerCase()));
+    if (callArgs.type) fp = fp.filter(p => p.type === callArgs.type);
+    const slim = fp.slice(0, 30).map(p => ({
+      id: p.id, name: p.name, type: p.type,
+      exerciseCount: p.exercises?.length ?? 0,
+      exercises: (p.exercises || []).map(e => ({ name: e.name, sets: e.sets, reps: e.reps, targetWeight: e.targetWeight || 0 })),
+    }));
+    return { plans: slim, total: fp.length, truncated: fp.length > 30 };
+  }
+
+  if (callName === 'query_workout_logs') {
+    let fl = workoutLogs;
+    if (callArgs.date_from) fl = fl.filter(l => (l.date || l.createdAt || '').substring(0, 10) >= callArgs.date_from);
+    if (callArgs.date_to) fl = fl.filter(l => (l.date || l.createdAt || '').substring(0, 10) <= callArgs.date_to);
+    if (callArgs.keyword) {
+      const kw = callArgs.keyword.toLowerCase();
+      fl = fl.filter(l =>
+        l.planName?.toLowerCase().includes(kw) ||
+        l.exercises?.some(e => e.name?.toLowerCase().includes(kw))
+      );
+    }
+    const slim = fl.slice(0, 30).map(l => ({
+      id: l.id, date: (l.date || l.createdAt || '').substring(0, 10),
+      planName: l.planName, planId: l.planId,
+      exerciseCount: l.exercises?.length ?? 0,
+      exercises: (l.exercises || []).map(e => ({ name: e.name, setCount: e.sets?.length ?? 0 })),
+      notes: l.notes || null,
+    }));
+    return { logs: slim, total: fl.length, truncated: fl.length > 30 };
+  }
+
   return { error: "Unknown productivity query" };
 }

@@ -4,7 +4,7 @@ import { format } from 'date-fns';
 import {
   CheckSquare, Wallet, Target, Clock, Plus, Sparkles,
   TrendingUp, Calendar, ArrowRight, Eye, EyeOff, Settings2,
-  MessageCircle, X,
+  MessageCircle, X, Settings
 } from 'lucide-react';
 import db from '../../db/dexie';
 
@@ -108,13 +108,22 @@ export default function DashboardView({ onNavigate }) {
             {format(new Date(), 'EEEE, MMMM d yyyy')}
           </p>
         </div>
-        <button
-          onClick={() => setShowSettings(true)}
-          className="dashboard-header__icon"
-          title="Dashboard settings"
-        >
-          <Settings2 className="w-5 h-5 text-accent" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowSettings(true)}
+            className="dashboard-header__icon"
+            title="Dashboard widgets"
+          >
+            <Settings2 className="w-5 h-5 text-text-muted" />
+          </button>
+          <button
+            onClick={() => onNavigate('settings')}
+            className="dashboard-header__icon"
+            title="App Settings"
+          >
+            <Settings className="w-5 h-5 text-text" />
+          </button>
+        </div>
       </header>
 
       {/* ════ Settings Modal ════ */}

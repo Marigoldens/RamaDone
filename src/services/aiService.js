@@ -269,6 +269,10 @@ function detectModeFromMessage(message) {
                 'how much', 'total spend', 'bill', 'invoice', 'transaction'],
     habits:   ['habit', 'streak', 'tracker', 'daily goal', 'mark habit', 'log habit',
                 'workout done', 'check off', 'routine', 'did my', 'completed my'],
+    gym:      ['workout', 'exercise', 'gym', 'bench press', 'squat', 'deadlift',
+                'push day', 'pull day', 'leg day', 'upper body', 'lower body',
+                'workout plan', 'workout log', 'sets and reps', 'reps', 'weight training',
+                'cardio session', 'chest day', 'back day', 'shoulder', 'bicep', 'tricep'],
   };
 
   const hits = {};

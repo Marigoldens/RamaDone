@@ -140,13 +140,13 @@ export default function SettingsView({ user, onSignOut }) {
                       navigator.geolocation.getCurrentPosition(res, rej));
                     await setPref('latitude', pos.coords.latitude);
                     await setPref('longitude', pos.coords.longitude);
-                    
+
                     // Clear cached prayer times so they regenerate with new coordinates
                     await db.table('prayerTimes').clear().catch(() => {
                       // Table might not exist yet if migration hasn't run
                       return db.events.where('type').anyOf('prayer', 'iftar').delete();
                     });
-                    
+
                     alert('Location synced! Prayer times will adapt to your new location.');
                   }}
                   className="settings-location-btn"
@@ -262,9 +262,6 @@ export default function SettingsView({ user, onSignOut }) {
                 Logout Account
               </button>
             </section>
-
-            {/* Footer */}
-            <p className="settings-footer">Ramadan Rhythm v1.0 · Crafting Serenity</p>
           </div>
 
         </div>

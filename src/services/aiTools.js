@@ -7,12 +7,15 @@ export const QUERY_TOOLS = [
   'query_events', 'get_schedule_summary', 'clear_date_range',
   'check_conflicts', 'find_free_slots', 'get_day_narrative',
   'query_tasks', 'query_expenses', 'query_habits',
+  'query_workout_plans', 'query_workout_logs',
 ];
 
 export const PRODUCTIVITY_MUTATIONS = [
   'add_task', 'update_task', 'delete_task',
   'add_expense', 'update_expense', 'delete_expense',
   'add_habit', 'update_habit', 'delete_habit', 'log_habit',
+  'add_workout_plan', 'update_workout_plan', 'delete_workout_plan',
+  'add_workout_log', 'delete_workout_log',
 ];
 
 // Used in the follow-up loop — tools that can be executed locally without user confirmation
@@ -20,6 +23,7 @@ export const FOLLOW_UP_QUERY_TOOLS = [
   'query_events', 'get_schedule_summary', 'check_conflicts',
   'find_free_slots', 'get_day_narrative',
   'query_tasks', 'query_expenses', 'query_habits',
+  'query_workout_plans', 'query_workout_logs',
 ];
 
 /**
@@ -350,6 +354,136 @@ export function getToolDeclarations() {
         },
       },
     },
+
+    // ── Gym / Workout tools ──────────────────────────────────────────────
+    {
+      name: "add_workout_plan",
+      description: "Create a new workout plan (template). Each plan has a name, type (Push/Pull/Legs/etc.), and a list of exercises.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          name:      { type: "STRING", description: "Plan name, e.g. 'Monday Push Day'" },
+          type:      { type: "STRING", description: "Plan type: Push, Pull, Legs, Upper, Lower, Full Body, Cardio, Custom" },
+          exercises: {
+            type: "ARRAY",
+            description: "List of exercises in the plan",
+            items: {
+              type: "OBJECT",
+              properties: {
+                name:         { type: "STRING",  description: "Exercise name, e.g. 'Bench Press'" },
+                sets:         { type: "INTEGER", description: "Number of sets (default 3)" },
+                reps:         { type: "INTEGER", description: "Target reps per set (default 10)" },
+                targetWeight: { type: "NUMBER",  description: "Target weight in kg (optional, default 0)" },
+              },
+              required: ["name"],
+            },
+          },
+        },
+        required: ["name", "type", "exercises"],
+      },
+    },
+    {
+      name: "update_workout_plan",
+      description: "Update an existing workout plan. Call query_workout_plans first to get the id.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          id:      { type: "INTEGER", description: "Plan id" },
+          updates: {
+            type: "OBJECT",
+            description: "Fields to update (name, type, exercises)",
+            properties: {
+              name:      { type: "STRING", description: "New plan name" },
+              type:      { type: "STRING", description: "New plan type" },
+              exercises: { type: "ARRAY",  description: "New exercises list", items: { type: "OBJECT" } },
+            },
+          },
+        },
+        required: ["id", "updates"],
+      },
+    },
+    {
+      name: "delete_workout_plan",
+      description: "Delete a workout plan. Call query_workout_plans first to find the id.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          id:       { type: "INTEGER", description: "Plan id" },
+          planName: { type: "STRING",  description: "Plan name for display" },
+        },
+        required: ["id"],
+      },
+    },
+    {
+      name: "query_workout_plans",
+      description: "List saved workout plans. Use for 'show my plans', 'what workouts do I have?'.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          keyword: { type: "STRING", description: "Keyword in plan name" },
+          type:    { type: "STRING", description: "Filter by plan type (Push, Pull, Legs, etc.)" },
+        },
+      },
+    },
+    {
+      name: "add_workout_log",
+      description: "Log a completed workout session with exercises, sets, weights and reps.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          planId:   { type: "INTEGER", description: "Optional plan id this log is based on" },
+          planName: { type: "STRING",  description: "Workout name, e.g. 'Push Day'" },
+          date:     { type: "STRING",  description: "Date ISO string, defaults to now" },
+          exercises: {
+            type: "ARRAY",
+            description: "Exercises performed",
+            items: {
+              type: "OBJECT",
+              properties: {
+                name: { type: "STRING", description: "Exercise name" },
+                sets: {
+                  type: "ARRAY",
+                  description: "Sets performed",
+                  items: {
+                    type: "OBJECT",
+                    properties: {
+                      weight: { type: "NUMBER",  description: "Weight used" },
+                      reps:   { type: "INTEGER", description: "Reps completed" },
+                    },
+                  },
+                },
+              },
+              required: ["name", "sets"],
+            },
+          },
+          notes: { type: "STRING", description: "Optional session notes" },
+        },
+        required: ["planName", "exercises"],
+      },
+    },
+    {
+      name: "delete_workout_log",
+      description: "Delete a workout log entry. Call query_workout_logs first to find the id.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          id: { type: "INTEGER", description: "Workout log id" },
+        },
+        required: ["id"],
+      },
+    },
+    {
+      name: "query_workout_logs",
+      description: "Search workout history. Use for 'show my recent workouts', 'what did I do this week?'.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          date_from: { type: "STRING", description: "YYYY-MM-DD start" },
+          date_to:   { type: "STRING", description: "YYYY-MM-DD end" },
+          keyword:   { type: "STRING", description: "Keyword in plan name or exercise name" },
+        },
+      },
+    },
   ];
 }
 
@@ -372,6 +506,8 @@ export function getToolsForMode(mode = 'all') {
     tasks:    ['add_task', 'update_task', 'delete_task', 'query_tasks'],
     expenses: ['add_expense', 'update_expense', 'delete_expense', 'query_expenses'],
     habits:   ['add_habit', 'update_habit', 'delete_habit', 'log_habit', 'query_habits'],
+    gym:      ['add_workout_plan', 'update_workout_plan', 'delete_workout_plan', 'query_workout_plans',
+              'add_workout_log', 'delete_workout_log', 'query_workout_logs'],
   };
 
   const allowed = TOOL_SETS[mode] ?? [];

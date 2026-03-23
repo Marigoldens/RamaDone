@@ -40,7 +40,9 @@ export default function ChatView({ user, accessToken }) {
   const expenses  = useLiveQuery(() => db.expenses.toArray(),  [], []);
   const habits    = useLiveQuery(() => db.habits.where('archived').equals(0).toArray(), [], []);
   const habitLogs = useLiveQuery(() => db.habitLogs.toArray(), [], []);
-  const productivityData = { tasks, expenses, habits, habitLogs };
+  const workoutPlans = useLiveQuery(() => db.workoutPlans.orderBy('createdAt').reverse().toArray(), [], []);
+  const workoutLogs  = useLiveQuery(() => db.workoutLogs.orderBy('date').reverse().toArray(), [], []);
+  const productivityData = { tasks, expenses, habits, habitLogs, workoutPlans, workoutLogs };
 
   const ramadanMode = preferences?.ramadanMode ?? false;
   const prayerMode  = preferences?.prayerMode  ?? true;
@@ -130,6 +132,27 @@ export default function ChatView({ user, accessToken }) {
           } else {
             await db.habitLogs.add({ habitId: action.args.habitId, date: action.args.date, completed: action.args.completed, count: 1, note: '' });
           }
+        } else if (action.tool === 'add_workout_plan') {
+          const exercises = (action.args.exercises || []).map(e => ({
+            name: e.name, sets: e.sets || 3, reps: e.reps || 10, targetWeight: e.targetWeight || 0,
+          }));
+          await db.workoutPlans.add({ name: action.args.name, type: action.args.type || 'Custom', exercises, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+        } else if (action.tool === 'update_workout_plan') {
+          const upd = { ...action.args.updates, updatedAt: new Date().toISOString() };
+          await db.workoutPlans.update(action.args.id, upd);
+        } else if (action.tool === 'delete_workout_plan') {
+          await db.workoutPlans.delete(action.args.id);
+        } else if (action.tool === 'add_workout_log') {
+          await db.workoutLogs.add({
+            date: action.args.date || new Date().toISOString(),
+            planId: action.args.planId || null,
+            planName: action.args.planName,
+            exercises: action.args.exercises || [],
+            notes: action.args.notes || '',
+            createdAt: new Date().toISOString(),
+          });
+        } else if (action.tool === 'delete_workout_log') {
+          await db.workoutLogs.delete(action.args.id);
         }
       }
       await updateMessageData(messageId, { isConfirmed: true });
@@ -196,6 +219,11 @@ export default function ChatView({ user, accessToken }) {
             case 'update_habit': return { tool: call.name, args: call.args, display: `Edit habit: "${h?.name || `Habit #${call.args.habitId}`}"`, sub: Object.entries(call.args.updates || {}).map(([k,v]) => `${k}: ${v}`).join(', ') };
             case 'delete_habit': return { tool: call.name, args: call.args, display: `Archive habit: "${h?.name || `Habit #${call.args.habitId}`}"`, sub: 'Habit will be hidden', danger: true };
             case 'log_habit':    return { tool: call.name, args: call.args, display: `${call.args.completed ? '✅ Mark done' : '↩️ Undo'}: "${h?.name || `Habit #${call.args.habitId}`}"`, sub: `Date: ${call.args.date}` };
+            case 'add_workout_plan':    return { tool: call.name, args: call.args, display: `Create plan: "${call.args.name}"`, sub: `${call.args.type} · ${(call.args.exercises || []).length} exercises` };
+            case 'update_workout_plan': return { tool: call.name, args: call.args, display: `Update plan #${call.args.id}`, sub: Object.entries(call.args.updates || {}).map(([k,v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join(', ') };
+            case 'delete_workout_plan': return { tool: call.name, args: call.args, display: `Delete plan: "${call.args.planName || `#${call.args.id}`}"`, sub: 'Cannot be undone', danger: true };
+            case 'add_workout_log':     return { tool: call.name, args: call.args, display: `Log workout: "${call.args.planName}"`, sub: `${(call.args.exercises || []).length} exercises` };
+            case 'delete_workout_log':  return { tool: call.name, args: call.args, display: `Delete workout log #${call.args.id}`, sub: 'Cannot be undone', danger: true };
             default:             return null;
           }
         };
@@ -225,7 +253,7 @@ export default function ChatView({ user, accessToken }) {
               });
             }
             queryResultsForAI.push({ name: call.name, result: queryResult, id: call.id });
-          } else if (['query_tasks', 'query_expenses', 'query_habits'].includes(call.name)) {
+          } else if (['query_tasks', 'query_expenses', 'query_habits', 'query_workout_plans', 'query_workout_logs'].includes(call.name)) {
             const result = executeProductivityQuery(call.name, call.args, productivityData);
             queryResultsForAI.push({ name: call.name, result, id: call.id });
           } else if (QUERY_TOOLS.includes(call.name)) {

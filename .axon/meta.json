@@ -1,0 +1,16 @@
+{
+  "version": "0.2.4",
+  "name": "RamaDone",
+  "path": "C:\\Users\\User\\Desktop\\RamaDone",
+  "stats": {
+    "files": 56,
+    "symbols": 181,
+    "relationships": 514,
+    "clusters": 19,
+    "flows": 20,
+    "dead_code": 59,
+    "coupled_pairs": 6,
+    "embeddings": 237
+  },
+  "last_indexed_at": "2026-03-22T10:38:19.906874+00:00"
+}

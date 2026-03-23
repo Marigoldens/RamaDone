@@ -1,29 +1,61 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { format } from 'date-fns';
 import {
   Plus, X, Dumbbell, Play, Trash2, Check, Edit2,
-  ClipboardList, History, Zap, ChevronLeft, Save,
-  Timer, Calendar as CalendarIcon, TrendingUp, Flame, User, Activity, Circle, CheckCircle2, Target
+  ClipboardList, History, Save,
+  Calendar as CalendarIcon, TrendingUp, Flame, Target, CheckCircle2, Sparkles,
+  AlignJustify, List
 } from 'lucide-react';
 import db from '../../db/dexie';
-import Leaderboard from './Leaderboard';
 
 const PLAN_TYPES = ['Push', 'Pull', 'Legs', 'Upper', 'Lower', 'Full Body', 'Cardio', 'Custom'];
 
 /**
- * Gym Tracker — simple user-driven flow:
- *   1. Create workout plans (templates)
- *   2. Pick a plan → log your weights/reps for each exercise
- *   3. View past logs in history
+ * Parse a pasted workout plan text into exercise objects.
+ * Supports lines like:
+ *   "Bench Press 4x8 @80kg"
+ *   "Bench Press 4x8"
+ *   "Bench Press"
  */
+function parsePlanText(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const results = [];
+  const rx = /^(.+?)\s+(\d+)\s*[xX×]\s*(\d+)(?:\s*[@＠]\s*([\d.]+))?/;
+  for (const line of lines) {
+    // Skip obvious header lines (all-caps short words, or lines that are just dashes/bullets)
+    if (/^[-–—•#*=]+$/.test(line)) continue;
+    const m = rx.exec(line);
+    if (m) {
+      results.push({
+        name: m[1].trim(),
+        sets: parseInt(m[2], 10) || 3,
+        reps: parseInt(m[3], 10) || 10,
+        targetWeight: m[4] ? parseFloat(m[4]) : 0,
+      });
+    } else if (line.length > 1 && !/^\d+$/.test(line)) {
+      // Plain exercise name with no sets/reps — add with defaults
+      results.push({ name: line, sets: 3, reps: 10, targetWeight: 0 });
+    }
+  }
+  return results;
+}
+
 export default function GymView() {
   const [activeSubTab, setActiveSubTab] = useState('plans');
   const [showAddPlan, setShowAddPlan] = useState(false);
   const [editingPlan, setEditingPlan] = useState(null);
 
-  // "Log" mode — user is filling in a workout from a plan
-  const [logging, setLogging] = useState(null);         // { planId, planName, exercises: [...] }
+  const [simplifiedView, setSimplifiedView] = useState(() => {
+    return localStorage.getItem('gym-simplified-view') === 'true';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('gym-simplified-view', simplifiedView);
+  }, [simplifiedView]);
+
+  // Active workout session state
+  const [logging, setLogging] = useState(null); // { planId, planName, exercises: [...] }
 
   /* ── Data ── */
   const plans = useLiveQuery(() => db.workoutPlans.orderBy('createdAt').reverse().toArray()) ?? [];
@@ -54,11 +86,10 @@ export default function GymView() {
   }
 
   async function deletePlan(id) {
-    if (!confirm('Delete this workout plan?')) return;
     await db.workoutPlans.delete(id);
   }
 
-  /* ═══════════ Start Logging ═══════════ */
+  /* ═══════════ Start Logging from a plan ═══════════ */
   function startLogging(plan) {
     setLogging({
       planId: plan.id,
@@ -69,23 +100,11 @@ export default function GymView() {
         targetReps: ex.reps,
         targetWeight: ex.targetWeight || 0,
         sets: Array.from({ length: ex.sets || 3 }, () => ({
-          // pre-fill with plan's target weight so user only tweaks
           weight: ex.targetWeight ? String(ex.targetWeight) : '',
           reps: String(ex.reps || ''),
           done: false,
         })),
       })),
-      notes: '',
-    });
-    setActiveSubTab('workout');
-  }
-
-  function startQuickLog() {
-    setLogging({
-      planId: null,
-      planName: 'Quick Workout',
-      exercises: [{ name: '', targetSets: 3, targetReps: 10, sets: [{ weight: '', reps: '', done: false }] }],
-      notes: '',
     });
     setActiveSubTab('workout');
   }
@@ -105,7 +124,7 @@ export default function GymView() {
 
   function stepWeight(exIdx, setIdx, delta) {
     const cur = Number(logging.exercises[exIdx].sets[setIdx].weight) || 0;
-    const next = Math.max(0, Math.round((cur + delta) * 4) / 4); // round to 0.25
+    const next = Math.max(0, Math.round((cur + delta) * 4) / 4);
     updateSet(exIdx, setIdx, 'weight', next === 0 ? '' : String(next));
   }
 
@@ -119,11 +138,43 @@ export default function GymView() {
     updateSet(exIdx, setIdx, 'done', !logging.exercises[exIdx].sets[setIdx].done);
   }
 
+  function tickAllSets(exIdx) {
+    setLogging(prev => ({
+      ...prev,
+      exercises: prev.exercises.map((ex, ei) =>
+        ei !== exIdx ? ex : {
+          ...ex,
+          sets: ex.sets.map(s => ({ ...s, done: true })),
+        }
+      ),
+    }));
+  }
+
+  function tickAllWorkoutSets() {
+    setLogging(prev => ({
+      ...prev,
+      exercises: prev.exercises.map(ex => ({
+        ...ex,
+        sets: ex.sets.map(s => ({ ...s, done: true }))
+      }))
+    }));
+  }
+
   function addSet(exIdx) {
     setLogging(prev => ({
       ...prev,
       exercises: prev.exercises.map((ex, ei) =>
         ei !== exIdx ? ex : { ...ex, sets: [...ex.sets, { weight: '', reps: '', done: false }] }
+      ),
+    }));
+  }
+
+  function removeSet(exIdx, setIdx) {
+    if (logging.exercises[exIdx].sets.length <= 1) return;
+    setLogging(prev => ({
+      ...prev,
+      exercises: prev.exercises.map((ex, ei) =>
+        ei !== exIdx ? ex : { ...ex, sets: ex.sets.filter((_, si) => si !== setIdx) }
       ),
     }));
   }
@@ -169,7 +220,8 @@ export default function GymView() {
       }));
 
     if (completedExercises.length === 0) {
-      alert('Mark at least one set as done before saving!');
+      setLogging(null);
+      setActiveSubTab('history');
       return;
     }
 
@@ -178,7 +230,6 @@ export default function GymView() {
       planId: logging.planId,
       planName: logging.planName,
       exercises: completedExercises,
-      notes: logging.notes,
       createdAt: new Date().toISOString(),
     });
 
@@ -187,169 +238,144 @@ export default function GymView() {
   }
 
   async function deleteLog(id) {
-    if (!confirm('Delete this workout log?')) return;
     await db.workoutLogs.delete(id);
   }
 
   /* ══════════════════════════════════════ */
   return (
-    <div className="gym-view bg-background min-h-screen text-primary pb-20 overflow-x-hidden">
-      
-      {/* HEADER SECTION */}
-      <header className="px-6 pt-8 pb-6 bg-surface border-b border-border relative z-10 sticky top-0 backdrop-blur-xl bg-opacity-80">
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-brand to-accent p-[2px] shadow-lg shadow-brand/20">
-              <div className="w-full h-full bg-surface rounded-full flex items-center justify-center">
-                <User size={20} className="text-primary" />
-              </div>
-            </div>
-            <div>
-              <h1 className="text-xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary">KINETIC VAULT</h1>
-              <span className="text-xs font-bold text-brand tracking-wider uppercase">Level 12 Athlete</span>
-            </div>
+    <div className="gym-view">
+
+      {/* HEADER */}
+      <header className="gym-header">
+        <div className="gym-header__top">
+          <h1 className="gym-header__title">Gym</h1>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {activeSubTab === 'plans' && (
+              <button
+                onClick={() => setSimplifiedView(prev => !prev)}
+                className="gym-header__add-btn"
+                title={simplifiedView ? "Show details" : "Simplified view"}
+                style={simplifiedView ? { background: 'var(--c-accent)', color: 'var(--c-bg)' } : {}}
+              >
+                {simplifiedView ? <List size={20} /> : <AlignJustify size={20} />}
+              </button>
+            )}
+            <button
+              onClick={() => { setEditingPlan(null); setShowAddPlan(true); }}
+              className="gym-header__add-btn"
+              title="New Program"
+            >
+              <Plus size={20} />
+            </button>
           </div>
-          <button onClick={() => { setEditingPlan(null); setShowAddPlan(true); }} className="w-10 h-10 rounded-xl bg-surface-elevated border border-border flex items-center justify-center hover:bg-surface-elevated hover:border-border transition-all">
-            <Plus size={20} className="text-primary" />
-          </button>
         </div>
-        
-        {/* QUICK STATS METRICS ROW */}
-        <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 relative snap-x md:grid md:grid-cols-3">
-          <div className="snap-start min-w-[130px] flex-1 bg-surface-elevated border border-border rounded-2xl p-4 flex flex-col gap-2 relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-brand/10 rounded-full blur-xl -mr-10 -mt-10 transition-all"></div>
-            <div className="flex items-center gap-2 text-muted">
-              <ClipboardList size={14} />
-              <span className="text-[10px] font-bold tracking-widest uppercase">Plans</span>
+
+        {/* QUICK STATS */}
+        <div className="gym-stats-row">
+          <div className="gym-stat-card">
+            <div className="gym-stat-card__label">
+              <ClipboardList size={13} /> Programs
             </div>
-            <div className="text-2xl font-black text-primary">{plans.length}</div>
+            <div className="gym-stat-card__value">{plans.length}</div>
           </div>
-          
-          <div className="snap-start min-w-[130px] flex-1 bg-surface-elevated border border-border rounded-2xl p-4 flex flex-col gap-2 relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-pink-500/10 rounded-full blur-xl -mr-10 -mt-10 transition-all"></div>
-            <div className="flex items-center gap-2 text-muted">
-              <Flame size={14} />
-              <span className="text-[10px] font-bold tracking-widest uppercase">This Week</span>
+          <div className="gym-stat-card">
+            <div className="gym-stat-card__label">
+              <Flame size={13} /> This Week
             </div>
-            <div className="text-2xl font-black text-primary">{thisWeekLogs.length}</div>
+            <div className="gym-stat-card__value">{thisWeekLogs.length}</div>
           </div>
-          
-          <div className="snap-start min-w-[130px] flex-1 bg-surface-elevated border border-border rounded-2xl p-4 flex flex-col gap-2 relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 rounded-full blur-xl -mr-10 -mt-10 transition-all"></div>
-            <div className="flex items-center gap-2 text-muted">
-              <TrendingUp size={14} />
-              <span className="text-[10px] font-bold tracking-widest uppercase">Total</span>
+          <div className="gym-stat-card">
+            <div className="gym-stat-card__label">
+              <TrendingUp size={13} /> Total
             </div>
-            <div className="text-2xl font-black text-primary">{logs.length}</div>
+            <div className="gym-stat-card__value">{logs.length}</div>
           </div>
         </div>
       </header>
 
-      {/* QUICK LOG CTA */}
-      <div className="px-6 mt-6 pt-2">
-        <button 
-          onClick={startQuickLog}
-          className="w-full relative overflow-hidden group bg-gradient-to-br from-brand to-accent rounded-2xl p-[1px] shadow-xl shadow-brand/20 shadow-brand/20 active:scale-[0.98] transition-transform"
-        >
-          <div className="bg-surface rounded-2xl p-4 flex items-center justify-between group-hover:bg-opacity-80 transition-all">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-brand/20 to-accent/20 flex items-center justify-center border border-border">
-                <Play size={24} className="text-brand ml-1 group-hover:scale-110 transition-transform" fill="currentColor" />
-              </div>
-              <div className="text-left">
-                <h3 className="font-bold text-lg text-primary">Start Empty Workout</h3>
-                <p className="text-xs text-muted mt-1">Jump right in without a plan</p>
-              </div>
-            </div>
-            <div className="w-8 h-8 rounded-full bg-surface-elevated flex items-center justify-center text-muted group-hover:text-primary transition-colors">
-              <Activity size={16} />
-            </div>
-          </div>
-        </button>
-      </div>
-
       {/* NAVIGATION TABS */}
-      <div className="px-6 mt-8">
-        <div className="flex bg-surface p-1.5 rounded-xl border border-border relative shadow-inner">
-          {[
-            { id: 'plans',   label: 'Programs', icon: ClipboardList },
-            { id: 'workout', label: 'Active',   icon: Dumbbell },
-            { id: 'history', label: 'History',  icon: History },
-            { id: 'leaderboard', label: 'Rankings',  icon: Target },
-          ].map(t => (
-            <button
-              key={t.id}
-              onClick={() => setActiveSubTab(t.id)}
-              className={`flex-1 py-2.5 flex items-center justify-center gap-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all z-10 ${
-                activeSubTab === t.id 
-                  ? 'bg-surface-elevated text-primary shadow-lg border border-border' 
-                  : 'text-muted hover:text-secondary hover:bg-surface-elevated'
-              }`}
-            >
-              <t.icon size={14} className={activeSubTab === t.id ? 'text-brand' : ''} />
-              {t.label}
-            </button>
-          ))}
-        </div>
+      <div className="gym-tabs">
+        {[
+          { id: 'plans',   label: 'Programs', icon: ClipboardList },
+          { id: 'workout', label: 'Active',   icon: Dumbbell },
+          { id: 'history', label: 'History',  icon: History },
+        ].map(t => (
+          <button
+            key={t.id}
+            onClick={() => setActiveSubTab(t.id)}
+            className={`gym-tab-btn ${activeSubTab === t.id ? 'gym-tab-btn--active' : ''}`}
+          >
+            <t.icon size={15} />
+            <span>{t.label}</span>
+          </button>
+        ))}
       </div>
 
       {/* VIEWS CONTENT */}
-      <div className="px-6 mt-8">
-        
+      <div className="gym-content">
+
         {/* ──── MY PLANS ──── */}
         {activeSubTab === 'plans' && (
-          <div className="flex flex-col gap-5">
+          <div className={`gym-plans-list ${simplifiedView ? 'gym-plans-list--grid' : ''}`}>
             {plans.length === 0 ? (
-              <div className="bg-surface border border-border rounded-3xl p-10 flex flex-col items-center justify-center text-center shadow-lg">
-                <div className="w-20 h-20 rounded-full bg-surface-elevated border border-border flex items-center justify-center mb-5 relative">
-                  <div className="absolute inset-0 bg-brand/10 blur-xl rounded-full"></div>
-                  <ClipboardList size={32} className="text-muted" />
-                </div>
-                <h3 className="text-xl font-black text-primary mb-2">No programs yet</h3>
-                <p className="text-sm text-muted mb-8 leading-relaxed">Create your first training program to get started on your journey.</p>
-                <button onClick={() => { setEditingPlan(null); setShowAddPlan(true); }} className="px-8 py-4 rounded-2xl bg-surface-elevated border border-border text-primary shadow-lg font-bold text-sm tracking-wide active:scale-[0.98] transition-all">
-                  Create Program
+              <div className="gym-empty">
+                <Dumbbell size={36} className="gym-empty__icon" />
+                <h3 className="gym-empty__title">No programs yet</h3>
+                <p className="gym-empty__text">Create your first program to start training.</p>
+                <button
+                  onClick={() => { setEditingPlan(null); setShowAddPlan(true); }}
+                  className="gym-plan-card__action-btn--start gym-empty__cta"
+                >
+                  <Plus size={16} /> Create Program
                 </button>
               </div>
             ) : (
               plans.map(plan => (
-                <div key={plan.id} className="bg-surface border border-border rounded-3xl overflow-hidden group shadow-lg">
-                  <div className="p-6">
-                    <div className="flex justify-between items-start mb-6">
-                      <div className="flex-1">
-                        <h3 className="text-xl font-black text-primary leading-tight break-words pr-2">{plan.name}</h3>
-                        <span className="inline-block mt-2 px-3 py-1 rounded-md bg-brand/10 text-brand text-[10px] font-bold tracking-widest uppercase">
-                          {plan.type}
-                        </span>
-                      </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => { setEditingPlan(plan); setShowAddPlan(true); }} className="w-10 h-10 rounded-xl bg-surface-elevated flex items-center justify-center text-muted border border-border hover:bg-surface-elevated hover:text-primary transition-all">
-                          <Edit2 size={16} />
-                        </button>
-                        <button onClick={() => deletePlan(plan.id)} className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center text-red-500 border border-red-500/20 hover:bg-red-500/20 transition-all">
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
+                <div key={plan.id} className="gym-plan-card">
+                  <div className="gym-plan-card__header">
+                    <div>
+                      <h3 className="gym-plan-card__name">{plan.name}</h3>
+                      <span className="gym-plan-card__type">{plan.type}</span>
                     </div>
-                    
-                    <div className="flex flex-col gap-3 mb-6 bg-background rounded-2xl p-4 border border-border">
-                      {plan.exercises.slice(0, 3).map((ex, i) => (
-                        <div key={i} className="flex justify-between items-center text-sm">
-                          <span className="text-secondary font-bold truncate pr-3">{ex.name}</span>
-                          <span className="text-muted font-mono text-xs whitespace-nowrap bg-surface-elevated px-2 py-1 rounded-md">
-                            {ex.sets}×{ex.reps} {ex.targetWeight ? `@ ${ex.targetWeight}kg` : ''}
+                    <div className="gym-plan-card__tools">
+                      <button
+                        onClick={() => { setEditingPlan(plan); setShowAddPlan(true); }}
+                        className="gym-plan-card__action-btn"
+                        title="Edit"
+                      >
+                        <Edit2 size={15} />
+                      </button>
+                      <button
+                        onClick={() => deletePlan(plan.id)}
+                        className="gym-plan-card__action-btn gym-plan-card__action-btn--danger"
+                        title="Delete"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {!simplifiedView && (
+                    <div className="gym-plan-card__exercises">
+                      {plan.exercises.slice(0, 4).map((ex, i) => (
+                        <div key={i} className="gym-plan-card__exercise">
+                          <span className="gym-plan-card__ex-name">{ex.name}</span>
+                          <span className="gym-plan-card__ex-meta">
+                            {ex.sets}×{ex.reps}{ex.targetWeight ? ` · ${ex.targetWeight}kg` : ''}
                           </span>
                         </div>
                       ))}
-                      {plan.exercises.length > 3 && (
-                        <div className="text-[10px] text-muted font-bold font-mono tracking-wider uppercase text-center mt-1 border-t border-border pt-3">
-                          + {plan.exercises.length - 3} more movement{plan.exercises.length - 3 !== 1 ? 's' : ''}
+                      {plan.exercises.length > 4 && (
+                        <div className="gym-plan-card__more">
+                          +{plan.exercises.length - 4} more
                         </div>
                       )}
                     </div>
-                    
-                    <button onClick={() => startLogging(plan)} className="w-full py-4 rounded-2xl bg-surface-elevated text-primary font-black text-sm tracking-wide border border-border flex items-center justify-center gap-2 hover:bg-surface-elevated transition-all group-hover:bg-gradient-to-r group-hover:from-brand group-hover:to-accent group-hover:border-transparent group-hover:shadow-xl shadow-brand/20">
-                      <Play size={16} className="fill-current" /> INITIALIZE ROUTINE
+                  )}
+
+                  <div className="gym-plan-card__actions" style={simplifiedView ? { marginTop: '12px' } : undefined}>
+                    <button onClick={() => startLogging(plan)} className="gym-plan-card__action-btn gym-plan-card__action-btn--start">
+                      <Play size={15} fill="currentColor" /> Start
                     </button>
                   </div>
                 </div>
@@ -358,168 +384,182 @@ export default function GymView() {
           </div>
         )}
 
-        {/* ──── LOG WORKOUT ──── */}
+        {/* ──── ACTIVE WORKOUT ──── */}
         {activeSubTab === 'workout' && (
-          <div className="w-full">
+          <div className="gym-workout-tab">
             {!logging ? (
-              <div className="flex flex-col gap-4">
-                {plans.length > 0 && (
-                  <>
-                    <p className="text-[10px] font-bold tracking-widest uppercase text-muted mb-2 ml-1">Select Program to Run</p>
-                    {plans.map(plan => (
-                      <button
-                        key={plan.id}
-                        onClick={() => startLogging(plan)}
-                        className="bg-surface border border-border rounded-3xl p-5 text-left hover:border-border hover:bg-surface-elevated active:scale-[0.98] transition-all w-full flex justify-between items-center group shadow-lg"
-                      >
-                        <div className="flex-1 min-w-0 pr-4">
-                          <h3 className="font-black text-primary text-lg truncate">{plan.name}</h3>
-                          <div className="flex items-center gap-2 mt-2">
-                            <span className="text-[10px] font-bold uppercase tracking-widest text-muted bg-background px-2 py-1 rounded-md">{plan.exercises.length} Exercises</span>
-                            <span className="text-[10px] font-bold uppercase tracking-widest text-brand bg-brand/10 px-2 py-1 rounded-md">{plan.type}</span>
-                          </div>
-                        </div>
-                        <div className="w-12 h-12 rounded-full bg-background border border-border flex items-center justify-center group-hover:bg-gradient-to-tr group-hover:from-brand group-hover:to-accent group-hover:border-transparent group-hover:text-primary transition-all shadow-inner group-hover:shadow-lg shadow-brand/20">
-                          <Play size={20} className="ml-1 fill-current" />
-                        </div>
-                      </button>
-                    ))}
-                    <div className="flex items-center gap-4 my-4">
-                      <div className="flex-1 h-px bg-surface-elevated"></div>
-                      <span className="text-[10px] font-black text-muted uppercase tracking-widest">or</span>
-                      <div className="flex-1 h-px bg-surface-elevated"></div>
-                    </div>
-                  </>
-                )}
-                <button onClick={startQuickLog} className="w-full py-5 rounded-3xl bg-surface border-2 border-dashed border-border text-secondary font-black text-xs tracking-widest uppercase flex items-center justify-center gap-2 active:scale-[0.98] transition-all hover:bg-surface-elevated hover:text-primary hover:border-border">
-                  <Zap size={18} className="text-brand" /> Freestyle Session
-                </button>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-8 -mx-6 px-6">
-                {/* Active Session Sticky Header */}
-                <div className="flex items-center justify-between sticky top-[90px] bg-background/90 backdrop-blur-xl z-20 py-4 border-b border-border -mt-8 shadow-sm">
+              // No active session — require picking a plan
+              plans.length === 0 ? (
+                <div className="gym-empty">
+                  <ClipboardList size={36} className="gym-empty__icon" />
+                  <h3 className="gym-empty__title">No programs yet</h3>
+                  <p className="gym-empty__text">Create a program first, then you can run a workout.</p>
                   <button
-                    onClick={() => { if (confirm('Discard this log?')) setLogging(null); }}
-                    className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-muted hover:text-red-500 transition-colors bg-surface-elevated hover:bg-red-500/20 px-3 py-2 rounded-xl"
+                    onClick={() => { setEditingPlan(null); setShowAddPlan(true); setActiveSubTab('plans'); }}
+                    className="gym-plan-card__action-btn--start gym-empty__cta"
+                  >
+                    <Plus size={16} /> Create Program
+                  </button>
+                </div>
+              ) : (
+                <div className="gym-pick-plan">
+                  <p className="gym-pick-plan__label">Pick a program</p>
+                  {plans.map(plan => (
+                    <button
+                      key={plan.id}
+                      onClick={() => startLogging(plan)}
+                      className="gym-pick-plan__card"
+                    >
+                      <div className="gym-pick-plan__info">
+                        <span className="gym-pick-plan__name">{plan.name}</span>
+                        <span className="gym-pick-plan__meta">
+                          {plan.type} · {plan.exercises.length} exercises
+                        </span>
+                      </div>
+                      <div className="gym-pick-plan__play">
+                        <Play size={18} fill="currentColor" />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )
+            ) : (
+              // Active session
+              <div className="gym-session">
+                {/* Session header */}
+                <div className="gym-session-header">
+                  <button
+                    onClick={() => setLogging(null)}
+                    className="gym-cancel-btn"
                   >
                     <X size={14} /> Cancel
                   </button>
-                  <span className="font-black text-primary text-sm truncate max-w-[150px] uppercase tracking-wider">{logging.planName}</span>
-                  <button onClick={saveWorkout} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-primary hover:text-primary transition-colors bg-gradient-to-r from-brand to-accent hover:opacity-90 px-4 py-2 rounded-xl shadow-[0_0_10px_rgba(168,85,247,0.4)]">
+                  <span className="gym-session-header__name">{logging.planName}</span>
+                  <button onClick={saveWorkout} className="gym-finish-btn--inline">
                     <Save size={14} /> Finish
                   </button>
                 </div>
+                
+                <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '0 16px 8px' }}>
+                  <button
+                    onClick={tickAllWorkoutSets}
+                    className="gym-icon-btn"
+                    style={{ fontSize: '0.75rem', gap: '6px', padding: '6px 12px', borderRadius: '20px', background: 'var(--c-surface-elevated)', border: '1px solid var(--c-border)', color: 'var(--c-text-muted)' }}
+                  >
+                    <CheckCircle2 size={14} /> Tick All Exercises
+                  </button>
+                </div>
 
-                <div className="flex flex-col gap-6 pb-24">
+                {/* Exercise list */}
+                <div className="gym-exercise-list">
                   {logging.exercises.map((ex, exIdx) => (
-                    <div key={exIdx} className="bg-surface border border-border rounded-3xl p-5 w-full overflow-hidden shadow-lg relative">
-                      <div className="absolute top-0 right-0 w-32 h-32 bg-surface-elevated rounded-bl-full -z-0 opacity-50 blur-2xl pointer-events-none"></div>
-                      
-                      <div className="flex items-start justify-between mb-4 relative z-10">
+                    <div key={exIdx} className="gym-exercise-item">
+                      {/* Exercise name row */}
+                      <div className="gym-exercise-item__top">
                         <input
                           type="text"
                           value={ex.name}
                           placeholder={`Exercise ${exIdx + 1}`}
                           onChange={e => updateExerciseName(exIdx, e.target.value)}
-                          className="bg-transparent border-none outline-none font-black tracking-tight text-xl text-primary w-full placeholder:text-muted focus:text-brand transition-colors"
+                          className="gym-exercise-item__name-input"
                         />
+                        <button
+                          onClick={() => tickAllSets(exIdx)}
+                          className="gym-icon-btn"
+                          title="Tick all sets"
+                          style={{ marginRight: '0.25rem', color: 'var(--c-accent)' }}
+                        >
+                          <CheckCircle2 size={16} />
+                        </button>
                         {logging.exercises.length > 1 && (
-                          <button onClick={() => removeExercise(exIdx)} className="w-10 h-10 rounded-xl bg-background border border-border flex items-center justify-center text-muted hover:bg-red-500/20 hover:border-red-500/20 hover:text-red-500 transition-all ml-3 shrink-0">
-                            <Trash2 size={16} />
+                          <button
+                            onClick={() => removeExercise(exIdx)}
+                            className="gym-icon-btn gym-icon-btn--danger"
+                          >
+                            <X size={14} />
                           </button>
                         )}
                       </div>
 
-                      {ex.targetSets && (ex.targetSets > 0) && (
-                        <div className="flex items-center gap-2 mb-6 mt-1 bg-background py-2 px-3 rounded-xl w-max border border-border relative z-10 shadow-inner">
-                          <Target size={14} className="text-brand" />
-                          <p className="text-xs font-bold font-mono text-muted tracking-wide">
-                            {ex.targetSets} sets × {ex.targetReps} reps
-                            {ex.targetWeight ? ` @ ${ex.targetWeight}kg` : ''}
-                          </p>
+                      {/* Target badge */}
+                      {ex.targetSets > 0 && (
+                        <div className="gym-target-badge">
+                          <Target size={12} />
+                          <span>{ex.targetSets}×{ex.targetReps}{ex.targetWeight ? ` @ ${ex.targetWeight}kg` : ''}</span>
                         </div>
                       )}
 
-                      {/* Sets container */}
-                      <div className="flex flex-col gap-2 relative z-10">
-                        {/* Header */}
-                        <div className="flex items-center px-1 pb-2 text-[9px] font-black tracking-widest uppercase text-muted">
-                          <div className="w-8 text-center">Set</div>
-                          <div className="flex-1 text-center">Weight kg</div>
-                          <div className="flex-1 text-center">Reps</div>
-                          <div className="w-12 text-center">Done</div>
+                      {/* Set rows */}
+                      <div className="gym-set-rows">
+                        <div className="gym-set-row gym-set-row--header">
+                          <span>Set</span>
+                          <span>kg</span>
+                          <span>Reps</span>
+                          <span>✓</span>
                         </div>
-                        
+
                         {ex.sets.map((set, setIdx) => (
-                          <div key={setIdx} className={`flex items-center gap-2 px-2 py-2.5 rounded-2xl transition-all border ${set.done ? 'bg-brand/10 border-brand/20 shadow-inner' : 'bg-background border-border'}`}>
-                            {/* Num */}
-                            <div className="w-8 flex justify-center font-black text-muted text-sm font-mono">
-                              {set.done ? <CheckCircle2 size={18} className="text-brand" /> : (setIdx + 1)}
+                          <div
+                            key={setIdx}
+                            className={`gym-set-row ${set.done ? 'gym-set-row--done' : ''}`}
+                          >
+                            <div className="gym-set-row__num">
+                              {set.done
+                                ? <CheckCircle2 size={16} style={{ color: 'var(--c-accent)' }} />
+                                : setIdx + 1}
                             </div>
 
-                            {/* Weight */}
-                            <div className="flex-1 flex bg-surface-elevated rounded-xl items-center overflow-hidden h-11 border border-border">
-                              <button onClick={() => stepWeight(exIdx, setIdx, -2.5)} className="w-10 h-full flex items-center justify-center text-muted font-black active:bg-surface-elevated hover:text-primary transition-colors">-</button>
+                            {/* Weight stepper */}
+                            <div className="gym-stepper">
+                              <button onClick={() => stepWeight(exIdx, setIdx, -2.5)} className="gym-stepper__btn">−</button>
                               <input
                                 type="number"
                                 inputMode="decimal"
                                 placeholder="0"
                                 value={set.weight}
                                 onChange={e => updateSet(exIdx, setIdx, 'weight', e.target.value)}
-                                className="flex-1 bg-transparent border-none text-center font-black !text-primary text-base h-full w-full outline-none focus:bg-surface-elevated transition-colors p-0 font-mono shadow-inner"
+                                className="gym-stepper__input"
                               />
-                              <button onClick={() => stepWeight(exIdx, setIdx, 2.5)} className="w-10 h-full flex items-center justify-center text-muted font-black active:bg-surface-elevated hover:text-primary transition-colors">+</button>
+                              <button onClick={() => stepWeight(exIdx, setIdx, 2.5)} className="gym-stepper__btn">+</button>
                             </div>
 
-                            {/* Reps */}
-                            <div className="flex-1 flex bg-surface-elevated rounded-xl items-center overflow-hidden h-11 border border-border">
-                              <button onClick={() => stepReps(exIdx, setIdx, -1)} className="w-10 h-full flex items-center justify-center text-muted font-black active:bg-surface-elevated hover:text-primary transition-colors">-</button>
+                            {/* Reps stepper */}
+                            <div className="gym-stepper gym-stepper--reps">
+                              <button onClick={() => stepReps(exIdx, setIdx, -1)} className="gym-stepper__btn">−</button>
                               <input
                                 type="number"
                                 inputMode="numeric"
                                 placeholder={String(ex.targetReps || '0')}
                                 value={set.reps}
                                 onChange={e => updateSet(exIdx, setIdx, 'reps', e.target.value)}
-                                className="flex-1 bg-transparent border-none text-center font-black !text-primary text-base h-full w-full outline-none focus:bg-surface-elevated transition-colors p-0 font-mono shadow-inner"
+                                className="gym-stepper__input"
                               />
-                              <button onClick={() => stepReps(exIdx, setIdx, 1)} className="w-10 h-full flex items-center justify-center text-muted font-black active:bg-surface-elevated hover:text-primary transition-colors">+</button>
+                              <button onClick={() => stepReps(exIdx, setIdx, 1)} className="gym-stepper__btn">+</button>
                             </div>
 
-                            {/* Check */}
+                            {/* Done check */}
                             <button
                               onClick={() => toggleSetDone(exIdx, setIdx)}
-                              className={`w-12 h-11 rounded-xl flex items-center justify-center border transition-all ${
-                                set.done 
-                                  ? 'bg-brand border-brand text-primary shadow-lg shadow-brand/20' 
-                                  : 'bg-surface-elevated border-border text-muted hover:border-border hover:bg-surface-elevated'
-                              }`}
+                              className={`gym-set-check ${set.done ? 'gym-set-check--done' : ''}`}
+                              onContextMenu={e => { e.preventDefault(); removeSet(exIdx, setIdx); }}
+                              title="Tap to complete · Right-click to remove"
                             >
-                              <Check size={20} strokeWidth={set.done ? 4 : 2.5} />
+                              <Check size={14} strokeWidth={set.done ? 4 : 2} />
                             </button>
                           </div>
                         ))}
                       </div>
-                      <button onClick={() => addSet(exIdx)} className="w-full mt-4 py-3 rounded-xl bg-background border border-dashed border-border text-muted font-bold text-[10px] uppercase tracking-widest hover:bg-surface-elevated transition-colors flex items-center justify-center gap-1 active:scale-[0.98]">
-                        <Plus size={14} /> Add Set
+
+                      <button onClick={() => addSet(exIdx)} className="gym-add-set-btn">
+                        <Plus size={13} /> Add Set
                       </button>
                     </div>
                   ))}
-
-                  <button onClick={addExercise} className="w-full py-5 rounded-3xl bg-transparent border-2 border-dashed border-border text-muted font-black text-xs tracking-widest uppercase hover:bg-surface-elevated hover:text-primary hover:border-border active:scale-[0.98] transition-all flex items-center justify-center gap-2">
-                    <Plus size={18} /> ADD MOVEMENT
-                  </button>
-
-                  <div className="bg-surface rounded-3xl p-5 border border-border shadow-lg">
-                    <h4 className="text-[10px] font-black uppercase tracking-widest text-muted mb-3 ml-1">Session Data</h4>
-                    <textarea
-                      placeholder="How did the workout feel? Any PRs?"
-                      value={logging.notes}
-                      onChange={e => setLogging(prev => ({ ...prev, notes: e.target.value }))}
-                      className="w-full min-h-[120px] bg-background rounded-2xl border border-border p-4 text-sm font-medium text-primary placeholder:text-muted focus:outline-none focus:border-brand/50 resize-y transition-colors shadow-inner"
-                    />
-                  </div>
                 </div>
+
+                <button onClick={addExercise} className="gym-add-exercise-btn">
+                  <Plus size={16} /> Add Exercise
+                </button>
               </div>
             )}
           </div>
@@ -527,83 +567,60 @@ export default function GymView() {
 
         {/* ──── HISTORY ──── */}
         {activeSubTab === 'history' && (
-          <div className="flex flex-col gap-4">
+          <div className="gym-history-list">
             {logs.length === 0 ? (
-              <div className="bg-surface border border-border rounded-3xl p-10 flex flex-col items-center justify-center text-center shadow-lg">
-                <div className="w-20 h-20 rounded-full bg-surface-elevated border border-border flex items-center justify-center mb-5 relative">
-                  <div className="absolute inset-0 bg-blue-500/10 blur-xl rounded-full"></div>
-                  <History size={32} className="text-muted" />
-                </div>
-                <h3 className="text-xl font-black text-primary mb-2">The Vault is empty</h3>
-                <p className="text-sm font-medium text-muted leading-relaxed max-w-[200px]">Complete a workout and your data will be securely stored here.</p>
+              <div className="gym-empty">
+                <History size={36} className="gym-empty__icon" />
+                <h3 className="gym-empty__title">No sessions yet</h3>
+                <p className="gym-empty__text">Complete a workout and it'll show up here.</p>
               </div>
             ) : (
               logs.map(log => (
-                <div key={log.id} className="bg-surface border border-border rounded-3xl p-5 overflow-hidden relative group shadow-lg">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-surface-elevated rounded-bl-full -z-0 opacity-0 group-hover:opacity-50 transition-opacity blur-2xl pointer-events-none"></div>
-                  <div className="flex justify-between items-start mb-4 relative z-10">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-background border border-border flex items-center justify-center shadow-inner">
-                        <CalendarIcon size={16} className="text-muted" />
+                <div key={log.id} className="gym-log-card">
+                  <div className="gym-log-card__header">
+                    <div className="gym-log-card__date-block">
+                      <div className="gym-log-card__icon-wrap">
+                        <CalendarIcon size={15} />
                       </div>
                       <div>
-                        <span className="text-base font-black text-primary block tracking-tight">
-                          {format(new Date(log.date), 'MMMM d, yyyy')}
-                        </span>
+                        <div className="gym-log-card__date">
+                          {format(new Date(log.date), 'MMM d, yyyy')}
+                        </div>
                         {log.planName && (
-                          <span className="text-[10px] font-bold tracking-widest uppercase text-brand block mt-0.5">{log.planName}</span>
+                          <div className="gym-log-card__plan">{log.planName}</div>
                         )}
                       </div>
                     </div>
                     <button
                       onClick={() => deleteLog(log.id)}
-                      className="text-muted hover:text-red-500 w-10 h-10 flex items-center justify-center rounded-xl bg-surface-elevated hover:bg-red-500/20 transition-colors"
+                      className="gym-icon-btn gym-icon-btn--danger"
                       title="Delete log"
                     >
-                      <Trash2 size={16} />
+                      <Trash2 size={15} />
                     </button>
                   </div>
-                  
-                  <div className="flex flex-col gap-2 mt-5 relative z-10 bg-background rounded-2xl p-4 border border-border">
+
+                  <div className="gym-log-card__exercises">
                     {log.exercises?.map((ex, i) => (
-                      <div key={i} className="flex justify-between items-center py-1">
-                        <span className="text-secondary font-bold text-sm tracking-tight truncate pr-2">{ex.name}</span>
-                        <div className="flex text-xs font-mono font-bold bg-surface-elevated px-2 py-1 rounded-md shrink-0">
-                          <span className="text-muted">{ex.sets?.length || 0} sets</span>
-                          {ex.sets?.[0]?.weight && (
-                            <>
-                              <span className="text-muted px-2">•</span>
-                              <span className="text-brand">{ex.sets[0].weight}kg</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
+                      <span key={i} className="gym-log-card__pill">
+                        {ex.name} · {ex.sets?.length}s
+                        {ex.sets?.[0]?.weight ? ` · ${ex.sets[0].weight}kg` : ''}
+                      </span>
                     ))}
                   </div>
-
-                  {log.notes && (
-                    <div className="mt-4 p-4 rounded-2xl bg-gradient-to-r from-brand/10 to-transparent border-l-4 border-l-purple-500 flex gap-3 text-sm relative z-10">
-                      <p className="text-secondary italic leading-relaxed font-serif font-medium">"{log.notes}"</p>
-                    </div>
-                  )}
                 </div>
               ))
             )}
           </div>
         )}
-
-        {/* ──── LEADERBOARD ──── */}
-        {activeSubTab === 'leaderboard' && (
-          <Leaderboard />
-        )}
       </div>
 
-      {/* ═══ Add/Edit Plan Modal ═══ */}
+      {/* ═══ Add/Edit Plan Bottom Tray ═══ */}
       {showAddPlan && (
-        <AddPlanModal 
+        <AddPlanTray
           initialPlan={editingPlan}
-          onSave={savePlan} 
-          onClose={() => { setShowAddPlan(false); setEditingPlan(null); }} 
+          onSave={savePlan}
+          onClose={() => { setShowAddPlan(false); setEditingPlan(null); }}
         />
       )}
     </div>
@@ -611,15 +628,32 @@ export default function GymView() {
 }
 
 
-/* ────── Add/Edit Workout Plan Modal ────── */
-function AddPlanModal({ onSave, onClose, initialPlan }) {
+/* ────── Add/Edit Workout Plan — Bottom Tray ────── */
+function AddPlanTray({ onSave, onClose, initialPlan }) {
   const [name, setName] = useState(initialPlan ? initialPlan.name : '');
   const [type, setType] = useState(initialPlan ? initialPlan.type : 'Push');
   const [exercises, setExercises] = useState(
-    initialPlan 
-      ? initialPlan.exercises.map(ex => ({ ...ex })) 
+    initialPlan
+      ? initialPlan.exercises.map(ex => ({ ...ex }))
       : [{ name: '', sets: 3, reps: 10, targetWeight: '' }]
   );
+
+  // AI paste state (only shown for new plans)
+  const [pasteText, setPasteText] = useState('');
+  const [showPaste, setShowPaste] = useState(!initialPlan);
+
+  function handleParse() {
+    const parsed = parsePlanText(pasteText);
+    if (parsed.length === 0) return;
+    setExercises(parsed.map(ex => ({
+      name: ex.name,
+      sets: ex.sets,
+      reps: ex.reps,
+      targetWeight: ex.targetWeight || '',
+    })));
+    setPasteText('');
+    setShowPaste(false);
+  }
 
   function addExercise() {
     setExercises(prev => [...prev, { name: '', sets: 3, reps: 10, targetWeight: '' }]);
@@ -651,141 +685,177 @@ function AddPlanModal({ onSave, onClose, initialPlan }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md" onClick={onClose}>
-      <div 
-        className="w-full max-w-md bg-background border border-border rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" 
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="px-6 py-5 border-b border-border flex items-center justify-between sticky top-0 bg-background/90 backdrop-blur-md z-10">
-          <h2 className="text-xl font-black tracking-tight text-primary uppercase">
+    <div className="gym-tray-overlay" onClick={onClose}>
+      <div className="gym-tray" onClick={e => e.stopPropagation()}>
+
+        {/* Drag handle */}
+        <div className="gym-tray__handle" />
+
+        {/* Header */}
+        <div className="gym-tray__header">
+          <h2 className="gym-tray__title">
             {initialPlan ? 'Edit Program' : 'New Program'}
           </h2>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl bg-surface-elevated border border-border text-muted hover:bg-surface-elevated hover:text-primary transition-colors active:scale-95">
-            <X size={16} />
+          <button onClick={onClose} className="gym-icon-btn">
+            <X size={18} />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-          <form id="plan-form" onSubmit={handleSubmit} className="flex flex-col gap-8">
-            <div className="space-y-5">
-              <div>
-                <label className="block text-[10px] font-black uppercase tracking-widest text-muted mb-2 ml-1">Program Name</label>
-                <input
-                  autoFocus type="text"
-                  placeholder="e.g., Push Day A, Leg Crusher"
-                  value={name} onChange={e => setName(e.target.value)}
-                  className="w-full bg-surface border border-border rounded-2xl px-5 py-4 text-primary font-bold placeholder:text-muted focus:outline-none focus:border-brand/50 focus:bg-surface-elevated transition-colors shadow-inner"
-                />
-              </div>
+        {/* Scrollable body */}
+        <div className="gym-tray__body">
+          <form id="plan-form" onSubmit={handleSubmit}>
 
-              <div>
-                <label className="block text-[10px] font-black uppercase tracking-widest text-muted mb-2 ml-1">Focus Type</label>
-                <div className="relative">
-                  <select 
-                    value={type} 
-                    onChange={e => setType(e.target.value)} 
-                    className="w-full appearance-none bg-surface border border-border rounded-2xl px-5 py-4 text-primary font-bold focus:outline-none focus:border-brand/50 focus:bg-surface-elevated transition-colors shadow-inner"
+            {/* AI Paste — only for new plans */}
+            {!initialPlan && showPaste && (
+              <div className="gym-ai-paste">
+                <p className="gym-ai-paste__label">
+                  <Sparkles size={13} /> Paste your plan
+                </p>
+                <textarea
+                  className="gym-ai-paste__textarea"
+                  placeholder={"Bench Press 4x8 @80kg\nIncline DB Press 3x10\nCable Fly 3x15 @15kg"}
+                  value={pasteText}
+                  onChange={e => setPasteText(e.target.value)}
+                  rows={4}
+                />
+                <div className="gym-ai-paste__actions">
+                  <button
+                    type="button"
+                    onClick={() => setShowPaste(false)}
+                    className="gym-ai-paste__skip"
                   >
-                    {PLAN_TYPES.map(t => <option key={t} value={t} className="font-bold bg-surface">{t}</option>)}
-                  </select>
-                  <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none">
-                    <ChevronLeft size={18} className="-rotate-90 text-muted" />
-                  </div>
+                    Skip
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleParse}
+                    disabled={!pasteText.trim()}
+                    className="gym-ai-parse-btn"
+                  >
+                    Parse ✨
+                  </button>
                 </div>
               </div>
+            )}
+
+            {!initialPlan && !showPaste && (
+              <button
+                type="button"
+                onClick={() => setShowPaste(true)}
+                className="gym-ai-parse-btn"
+                style={{ alignSelf: 'flex-start', marginBottom: 4 }}
+              >
+                <Sparkles size={13} /> Paste plan instead
+              </button>
+            )}
+
+            {/* Plan name */}
+            <div className="gym-field">
+              <label className="gym-field__label">Program Name</label>
+              <input
+                autoFocus
+                type="text"
+                placeholder="e.g. Push Day A"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                className="gym-field__input"
+              />
             </div>
 
-            <div className="h-px w-full bg-surface-elevated my-1"></div>
+            {/* Focus type */}
+            <div className="gym-field">
+              <label className="gym-field__label">Focus Type</label>
+              <select
+                value={type}
+                onChange={e => setType(e.target.value)}
+                className="gym-field__input"
+              >
+                {PLAN_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-4 mt-2">
-                <label className="block text-[10px] font-black uppercase tracking-widest text-muted ml-1">Movements Matrix</label>
-                <div className="text-[10px] font-black tracking-widest text-brand bg-brand/10 px-2 py-1 rounded-md uppercase">
-                  {exercises.length} Total
-                </div>
+            {/* Exercises */}
+            <div className="gym-field">
+              <div className="gym-field__row">
+                <label className="gym-field__label">Exercises</label>
+                <span className="gym-plan-card__type">{exercises.length}</span>
               </div>
 
-              <div className="flex flex-col gap-3">
+              <div className="gym-modal-exercises">
                 {exercises.map((ex, idx) => (
-                  <div key={idx} className="bg-surface border border-border shadow-inner rounded-3xl p-4 flex flex-col gap-4 relative group">
-                    <div className="flex items-center justify-between">
-                      <div className="text-[10px] font-black tracking-widest text-muted uppercase bg-surface-elevated px-2 py-1 rounded-md">Exercise {idx + 1}</div>
+                  <div key={idx} className="gym-modal-exercise-row">
+                    <div className="gym-modal-exercise-row__top">
+                      <span className="gym-modal-exercise-row__num">#{idx + 1}</span>
                       {exercises.length > 1 && (
-                        <button 
-                          type="button" 
-                          onClick={() => removeExercise(idx)} 
-                          className="w-8 h-8 rounded-xl flex items-center justify-center text-muted hover:text-red-500 hover:bg-red-500/20 transition-colors"
+                        <button
+                          type="button"
+                          onClick={() => removeExercise(idx)}
+                          className="gym-modal-remove-btn"
                         >
-                          <X size={14} />
+                          <X size={13} />
                         </button>
                       )}
                     </div>
-                    
-                    <input 
-                      type="text" 
-                      placeholder={`Movement Name`} 
+
+                    <input
+                      type="text"
+                      placeholder="Exercise Name"
                       value={ex.name || ''}
                       onChange={e => updateExercise(idx, 'name', e.target.value)}
-                      className="w-full bg-background border border-transparent focus:border-border rounded-xl px-4 py-3 text-base font-bold text-primary placeholder:text-muted outline-none transition-colors" 
+                      className="gym-field__input"
                     />
-                    
-                    <div className="flex gap-2">
-                      <div className="flex-1 bg-background border border-transparent focus-within:border-border rounded-xl px-3 py-2 flex flex-col transition-colors">
-                        <span className="text-[9px] font-black uppercase tracking-widest text-muted mb-1">Sets</span>
-                        <input 
-                          type="number" 
-                          placeholder="3" 
-                          value={ex.sets || ''} 
+
+                    <div className="gym-modal-exercise-row__grids">
+                      <div className="gym-mini-field">
+                        <span className="gym-mini-field__label">Sets</span>
+                        <input
+                          type="number"
+                          placeholder="3"
+                          value={ex.sets || ''}
                           onChange={e => updateExercise(idx, 'sets', e.target.value)}
-                          className="w-full bg-transparent text-sm font-bold font-mono text-primary placeholder:text-muted outline-none text-left" 
+                          className="gym-mini-field__input"
                         />
                       </div>
-                      
-                      <div className="flex-1 bg-background border border-transparent focus-within:border-border rounded-xl px-3 py-2 flex flex-col transition-colors">
-                        <span className="text-[9px] font-black uppercase tracking-widest text-muted mb-1">Reps</span>
-                        <input 
-                          type="number" 
-                          placeholder="10" 
-                          value={ex.reps || ''} 
+                      <div className="gym-mini-field">
+                        <span className="gym-mini-field__label">Reps</span>
+                        <input
+                          type="number"
+                          placeholder="10"
+                          value={ex.reps || ''}
                           onChange={e => updateExercise(idx, 'reps', e.target.value)}
-                          className="w-full bg-transparent text-sm font-bold font-mono text-primary placeholder:text-muted outline-none text-left" 
+                          className="gym-mini-field__input"
                         />
                       </div>
-                      
-                      <div className="flex-1 bg-background border border-transparent focus-within:border-border rounded-xl px-3 py-2 flex flex-col transition-colors">
-                        <span className="text-[9px] font-black uppercase tracking-widest text-muted mb-1">Wt (kg)</span>
-                        <input 
-                          type="number" 
-                          placeholder="Opt" 
+                      <div className="gym-mini-field">
+                        <span className="gym-mini-field__label">kg (opt)</span>
+                        <input
+                          type="number"
+                          placeholder="—"
                           value={ex.targetWeight || ''}
                           onChange={e => updateExercise(idx, 'targetWeight', e.target.value)}
-                          className="w-full bg-transparent text-sm font-bold font-mono text-brand placeholder:text-brand/30 outline-none text-left" 
+                          className="gym-mini-field__input gym-mini-field__input--accent"
                         />
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
-              <button 
-                type="button" 
-                onClick={addExercise} 
-                className="w-full mt-4 py-4 rounded-3xl border-2 border-dashed border-border text-muted font-black text-[10px] tracking-widest uppercase hover:bg-surface-elevated hover:text-primary hover:border-border transition-colors flex items-center justify-center gap-2 active:scale-95"
-              >
-                <Plus size={16} /> Add Another Movement
+
+              <button type="button" onClick={addExercise} className="gym-add-set-btn" style={{ marginTop: 8 }}>
+                <Plus size={14} /> Add Exercise
               </button>
             </div>
+
           </form>
         </div>
-        
-        <div className="p-5 border-t border-border bg-background/90 backdrop-blur-md sticky bottom-0 z-10">
-          <button 
-            type="submit" 
-            form="plan-form"
-            className="w-full py-5 rounded-2xl bg-gradient-to-br from-brand to-accent text-primary font-black text-sm tracking-widest uppercase shadow-xl shadow-brand/20 active:scale-[0.98] transition-all transform flex justify-center items-center gap-2 hover:from-brand hover:to-accent"
-          >
-            {initialPlan ? 'Update Program' : 'Create Program'} <Check size={18} strokeWidth={3} />
+
+        {/* Footer */}
+        <div className="gym-tray__footer">
+          <button type="submit" form="plan-form" className="gym-finish-btn">
+            {initialPlan ? 'Update Program' : 'Create Program'} <Check size={16} strokeWidth={3} />
           </button>
         </div>
+
       </div>
     </div>
   );

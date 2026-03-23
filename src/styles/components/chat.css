@@ -625,3 +625,9 @@
   background: linear-gradient(135deg, #f59e0b, #fb923c);
   border-color: transparent;
 }
+
+.chat-mode-pill--gym.chat-mode-pill--active {
+  color: #fff;
+  background: linear-gradient(135deg, #ef4444, #f97316);
+  border-color: transparent;
+}

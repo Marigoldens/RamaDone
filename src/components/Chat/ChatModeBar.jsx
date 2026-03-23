@@ -1,4 +1,4 @@
-import { Sparkles, Calendar, CheckSquare, Wallet, Target } from 'lucide-react';
+import { Sparkles, Calendar, CheckSquare, Wallet, Target, Dumbbell } from 'lucide-react';
 
 export const CHAT_MODES = [
   { id: 'all',      label: 'All',      Icon: Sparkles,    color: 'all' },
@@ -6,6 +6,7 @@ export const CHAT_MODES = [
   { id: 'tasks',    label: 'Tasks',    Icon: CheckSquare, color: 'tasks' },
   { id: 'expenses', label: 'Expenses', Icon: Wallet,      color: 'expenses' },
   { id: 'habits',   label: 'Habits',   Icon: Target,      color: 'habits' },
+  { id: 'gym',      label: 'Gym',      Icon: Dumbbell,    color: 'gym' },
 ];
 
 // Per-mode quick suggestion prompts shown in the empty state
@@ -34,6 +35,11 @@ export const MODE_SUGGESTIONS = {
     { text: "Show today's habits", icon: '🎯' },
     { text: 'Mark my workout done', icon: '💪' },
     { text: 'Add a new habit: read 20 pages', icon: '📖' },
+  ],
+  gym: [
+    { text: 'Show my workout plans', icon: '📋' },
+    { text: 'Log a push day workout', icon: '🏋️' },
+    { text: 'What did I work out this week?', icon: '📊' },
   ],
 };
 
