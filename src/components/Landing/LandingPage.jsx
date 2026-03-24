@@ -1,197 +1,336 @@
 /**
- * @fileoverview Landing Page — mobile-first with desktop responsive layout.
+ * @fileoverview Landing Page — RamaDone pre-auth welcome.
  *
- * RESPONSIVE STRATEGY:
- * - Mobile (<768px): Single column, stacked vertically (current)
- * - Desktop (≥768px): Two-column split — hero left, features right
- * - Large desktop (≥1024px): Extra spacing, larger typography
+ * LAYOUT: All structural layout uses plain CSS classes from landing.css
+ * (NOT Tailwind utilities for layout) to match the rest of the project.
+ * Colors use the project's --c-* CSS variable system from index.css.
+ *
+ * SECTIONS:
+ *   1. Navbar — sticky, glass-blur
+ *   2. Hero — two-column: text left, phone mockup right (stacks on mobile)
+ *   3. Features — 4-column grid (2-col tablet, 1-col mobile)
+ *   4. Pricing — single centered card
+ *   5. CTA — centered sign-in prompt
+ *   6. Footer
  */
-import { Moon, Calendar, MessageCircle, Sparkles, Clock, Palette } from 'lucide-react';
+import { useState } from 'react';
+import {
+  Moon, LayoutDashboard, Calendar, CheckSquare, Wallet,
+  Target, Dumbbell, Clock, MessageCircle, Sparkles,
+  Check, Star, Shield, Zap, ChevronRight, Menu, X
+} from 'lucide-react';
 
+/* ───────── Data ───────── */
 const FEATURES = [
-  {
-    icon: Clock,
-    title: 'Auto Prayer Times',
-    desc: 'Fajr, Maghrib, Isha — synced to your exact location',
-    delay: '0.1s',
-  },
-  {
-    icon: Calendar,
-    title: 'Smart Calendar',
-    desc: 'Beautiful 24-hour timeline with Google Calendar sync',
-    delay: '0.2s',
-  },
-  {
-    icon: MessageCircle,
-    title: 'AI Schedule Assistant',
-    desc: 'Ask Gemini to plan your day around prayers & iftar',
-    delay: '0.3s',
-  },
-  {
-    icon: Palette,
-    title: 'Custom Themes',
-    desc: 'Dark mode, desert sand, and more — your Ramadan, your style',
-    delay: '0.4s',
-  },
+  { icon: LayoutDashboard, title: 'Dashboard',       desc: 'Unified home screen with real-time productivity stats, daily goals, and spiritual reminders.' },
+  { icon: Calendar,        title: 'Smart Calendar',   desc: 'Full Day/Week/Month views with seamless Google Calendar sync and event management.' },
+  { icon: CheckSquare,     title: 'Task Manager',     desc: 'Kanban boards and list views with priority levels and deep focus mode.' },
+  { icon: Wallet,          title: 'Expense Tracker',  desc: 'Local-first income and spending logs with AI-generated visual reports.' },
+  { icon: Target,          title: 'Habit Tracker',    desc: 'Cultivate consistency with streak counters, daily check-ins, and progress tracking.' },
+  { icon: Dumbbell,        title: 'Gym Tracker',      desc: 'Program-first workout management with AI parsing of workout notes.' },
+  { icon: Clock,           title: 'Prayer Times',     desc: 'Automatic GPS-based prayer times using the AlAdhan API with notifications.' },
+  { icon: MessageCircle,   title: 'AI Chat',          desc: '31 specialized AI tools powered by DeepSeek across productivity and spiritual growth.' },
 ];
 
-/**
- * @param {{ onSignIn: () => void }} props
- */
+const PRICING_FEATURES = [
+  'All productivity modules',
+  'AI chatbot (100 messages/month)',
+  'Google Calendar sync',
+  '3 beautiful themes',
+  'Offline-first & Local storage',
+  'Future lifetime updates',
+];
+
+/* ───────── Component ───────── */
 export default function LandingPage({ onSignIn }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
   return (
-    <div className="min-h-dvh bg-surface overflow-hidden relative">
-      {/* ============ BACKGROUND DECORATIONS ============ */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-32 -right-32 w-96 h-96 md:w-[500px] md:h-[500px] rounded-full opacity-20 orb-accent" />
-        <div className="absolute -bottom-24 -left-24 w-72 h-72 md:w-96 md:h-96 rounded-full opacity-15 orb-primary" />
-        {/* Extra desktop orb */}
-        <div className="hidden md:block absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
-                     w-[600px] h-[600px] rounded-full opacity-[0.07] orb-center" />
-        {/* Floating stars */}
-        {[...Array(20)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute rounded-full bg-accent opacity-30"
+    <div className="landing">
+
+      {/* Background orbs */}
+      <div className="landing__bg">
+        <div className="landing__orb landing__orb--accent" />
+        <div className="landing__orb landing__orb--primary" />
+        {[...Array(10)].map((_, i) => (
+          <div key={i} className="landing__star"
             style={{
-              width: `${2 + Math.random() * 3}px`,
-              height: `${2 + Math.random() * 3}px`,
+              width: `${2 + Math.random() * 2}px`,
+              height: `${2 + Math.random() * 2}px`,
               top: `${5 + Math.random() * 90}%`,
               left: `${5 + Math.random() * 90}%`,
-              animation: `float ${3 + Math.random() * 4}s ease-in-out infinite`,
               animationDelay: `${Math.random() * 3}s`,
+              animationDuration: `${3 + Math.random() * 4}s`,
             }}
           />
         ))}
       </div>
 
-      {/* ============ MAIN CONTENT ============ */}
-      {/*
-        MOBILE: single centered column
-        DESKTOP: two-column layout with hero left, features right
-      */}
-      <div className="relative z-10 min-h-dvh flex flex-col">
-        <div className="flex-1 flex flex-col md:flex-row md:items-center
-                        max-w-6xl mx-auto w-full px-6 py-12 md:py-0 md:gap-12 lg:gap-20">
+      {/* Page content — sits above background */}
+      <div style={{ position: 'relative', zIndex: 1 }}>
 
-          {/* ====== LEFT COLUMN — Hero ====== */}
-          <div className="flex flex-col items-center md:items-start md:flex-1 md:max-w-md lg:max-w-lg">
-            {/* Crescent Moon Icon */}
-            <div className="mb-6 md:mb-8 animate-fade-in-up">
-              <div
-                className="w-24 h-24 md:w-28 md:h-28 lg:w-32 lg:h-32 rounded-full
-                           flex items-center justify-center animate-pulse-glow cta-gradient"
-              >
-                <Moon className="w-12 h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 text-surface" fill="currentColor" />
+        {/* ═══ NAVBAR ═══ */}
+        <nav className="landing__nav">
+          <div className="landing__container landing__nav-inner">
+            <div className="landing__brand">
+              <div className="landing__brand-icon">
+                <Moon style={{ width: 16, height: 16 }} fill="currentColor" />
               </div>
+              <span className="landing__brand-name">RamaDone</span>
             </div>
 
-            <div className="text-center md:text-left animate-fade-in-up">
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-text tracking-tight mb-3 leading-tight">
-                Ramadan Rhythm
-                <span className="block text-accent text-2xl md:text-3xl lg:text-4xl font-medium mt-1 md:mt-2">
-                  Scheduler
-                </span>
-              </h1>
-
-              <p className="text-text-muted text-lg md:text-xl max-w-sm md:max-w-md leading-relaxed mt-2">
-                Your AI-powered companion for a perfectly organized Ramadan.
-                Prayer times, smart scheduling, and Google Calendar sync.
-              </p>
+            <div className="landing__nav-links">
+              <a href="#features" className="landing__nav-link">Features</a>
+              <a href="#pricing" className="landing__nav-link">Pricing</a>
+              <button onClick={onSignIn} className="landing__nav-cta">Get Started</button>
             </div>
 
-            {/* CTA — on mobile under features, on desktop under hero text */}
-            <div
-              className="hidden md:block w-full max-w-sm mt-8 lg:mt-10 animate-fade-in-up opacity-0 landing-cta-delay"
-            >
-              <button
-                onClick={onSignIn}
-                className="w-full py-4 px-6 rounded-2xl font-semibold text-base
-                           flex items-center justify-center gap-3
-                           transition-all duration-300 cursor-pointer
-                           hover:scale-[1.02] active:scale-[0.98]
-                           animate-pulse-glow cta-gradient"
-              >
-                <GoogleIcon />
-                Sign in with Google
-              </button>
-              <p className="text-text-muted text-xs mt-3 opacity-70">
-                We'll sync your Ramadan schedule to a dedicated Google Calendar
-              </p>
-            </div>
+            <button onClick={() => setMenuOpen(!menuOpen)} className="landing__menu-btn">
+              {menuOpen
+                ? <X style={{ width: 20, height: 20 }} />
+                : <Menu style={{ width: 20, height: 20 }} />}
+            </button>
           </div>
 
-          {/* ====== RIGHT COLUMN — Features ====== */}
-          <div className="flex-1 md:max-w-md lg:max-w-lg mt-10 md:mt-0">
-            <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 mb-10 md:mb-0">
-              {FEATURES.map(({ icon: Icon, title, desc, delay }) => (
-                <div
-                  key={title}
-                  className={`animate-fade-in-up opacity-0 bg-surface rounded-2xl p-6
-                             border border-border/50 flex items-start gap-4 transition-all duration-300
-                             hover:border-accent/40 hover:shadow-premium
-                             md:flex-col md:items-center md:text-center
-                             landing-card-delay-${delay.replace('.', '').replace('0s', '').slice(0,1)}`}
-                >
-                  <div
-                    className="w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl
-                               flex items-center justify-center shrink-0 shadow-lg shadow-accent-glow/20 feature-icon-gradient"
-                  >
-                    <Icon className="w-6 h-6 md:w-7 md:h-7 text-white" />
+          {menuOpen && (
+            <div className="landing__mobile-menu">
+              <a href="#features" className="landing__mobile-link" onClick={() => setMenuOpen(false)}>Features</a>
+              <a href="#pricing" className="landing__mobile-link" onClick={() => setMenuOpen(false)}>Pricing</a>
+              <button onClick={onSignIn} className="landing__mobile-cta">Get Started</button>
+            </div>
+          )}
+        </nav>
+
+        {/* ═══ HERO ═══ */}
+        <section className="landing__hero">
+          <div className="landing__container">
+            <div className="landing__hero-grid">
+
+              {/* Left — text */}
+              <div className="landing__hero-text landing-animate">
+                <p className="landing__hero-badge">
+                  <Sparkles style={{ width: 14, height: 14 }} />
+                  AI-Powered Productivity
+                </p>
+
+                <h1 className="landing__hero-title">
+                  Focus on the<br />
+                  <span>Divine.</span><br />
+                  We'll Handle the Rest.
+                </h1>
+
+                <p className="landing__hero-desc">
+                  The all-in-one AI companion designed for the modern Ummah.
+                  Seamlessly balance your worldly tasks with your spiritual goals.
+                </p>
+
+                <div className="landing__hero-actions">
+                  <button onClick={onSignIn} className="landing__btn-primary">
+                    <GoogleIcon /> Sign in with Google
+                  </button>
+                  <a href="#features" className="landing__btn-secondary">
+                    Learn More <ChevronRight style={{ width: 14, height: 14 }} />
+                  </a>
+                </div>
+
+                <p className="landing__hero-note">
+                  <Shield style={{ width: 12, height: 12, color: 'var(--c-accent)' }} />
+                  100% local storage — your data never leaves your device
+                </p>
+              </div>
+
+              {/* Right — phone mockup with real UI */}
+              <div className="landing__hero-mockup landing-animate" style={{ animationDelay: '0.2s' }}>
+                <div className="landing__phone">
+                  {/* Notch */}
+                  <div className="landing__phone-notch">
+                    <div className="landing__phone-notch-bar" />
                   </div>
-                  <div>
-                    <h3 className="font-black text-text text-sm md:text-base tracking-tight">{title}</h3>
-                    <p className="text-text-muted text-xs md:text-sm mt-1 leading-relaxed font-medium">{desc}</p>
+
+                  {/* Screen content — mini dashboard */}
+                  <div className="landing__phone-screen">
+                    {/* Header */}
+                    <div className="landing__phone-header">
+                      <span className="landing__phone-header-title">Dashboard</span>
+                      <span className="landing__phone-header-badge">Day 15</span>
+                    </div>
+
+                    {/* Stats */}
+                    <div className="landing__phone-stats">
+                      <div className="landing__phone-stat landing__phone-stat--accent">
+                        <div className="landing__phone-stat-value">5</div>
+                        <div className="landing__phone-stat-label">Tasks Today</div>
+                      </div>
+                      <div className="landing__phone-stat landing__phone-stat--primary">
+                        <div className="landing__phone-stat-value">87%</div>
+                        <div className="landing__phone-stat-label">Habits Done</div>
+                      </div>
+                    </div>
+
+                    {/* Tasks */}
+                    <div className="landing__phone-tasks">
+                      <div className="landing__phone-task landing__phone-task--done">
+                        <div className="landing__phone-task-check" />
+                        <span>Fajr prayer ✓</span>
+                      </div>
+                      <div className="landing__phone-task">
+                        <div className="landing__phone-task-check" />
+                        <span>Review lecture notes</span>
+                      </div>
+                      <div className="landing__phone-task">
+                        <div className="landing__phone-task-check" />
+                        <span>Gym — Push day</span>
+                      </div>
+                      <div className="landing__phone-task">
+                        <div className="landing__phone-task-check" />
+                        <span>Read 10 pages Quran</span>
+                      </div>
+                    </div>
+
+                    {/* Prayer time bar */}
+                    <div className="landing__phone-header" style={{ marginTop: 'auto' }}>
+                      <span className="landing__phone-header-title">🕌 Maghrib</span>
+                      <span className="landing__phone-header-badge">6:42 PM</span>
+                    </div>
                   </div>
+
+                  {/* Bottom nav */}
+                  <div className="landing__phone-nav">
+                    <LayoutDashboard className="landing__phone-nav-dot landing__phone-nav-dot--active" />
+                    <Calendar className="landing__phone-nav-dot" />
+                    <CheckSquare className="landing__phone-nav-dot" />
+                    <MessageCircle className="landing__phone-nav-dot" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ═══ FEATURES ═══ */}
+        <section id="features" className="landing__features">
+          <div className="landing__container">
+            <div className="landing__section-header landing-animate">
+              <h2 className="landing__section-title">Everything You Need, In One App</h2>
+              <p className="landing__section-desc">
+                Designed to bridge the gap between high-performance productivity and spiritual mindfulness.
+              </p>
+            </div>
+
+            <div className="landing__features-grid">
+              {FEATURES.map(({ icon: Icon, title, desc }, idx) => (
+                <div key={title}
+                     className={`landing__feature-card landing-animate--stagger landing-animate--delay-${idx + 1}`}>
+                  <div className="landing__feature-icon">
+                    <Icon />
+                  </div>
+                  <h3 className="landing__feature-title">{title}</h3>
+                  <p className="landing__feature-desc">{desc}</p>
                 </div>
               ))}
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* CTA — mobile only (appears below feature cards) */}
-        <div
-          className="md:hidden w-full px-6 pb-4 animate-fade-in-up opacity-0 landing-cta-delay"
-        >
-          <button
-            onClick={onSignIn}
-            className="w-full max-w-lg mx-auto py-4 px-6 rounded-2xl font-semibold text-base
-                       flex items-center justify-center gap-3
-                       transition-all duration-300 cursor-pointer
-                       hover:scale-[1.02] active:scale-[0.98]
-                       animate-pulse-glow cta-gradient"
-          >
-            <GoogleIcon />
-            Sign in with Google
-          </button>
-          <p className="text-text-muted text-xs text-center mt-3 opacity-70">
-            We'll sync your Ramadan schedule to a dedicated Google Calendar
-          </p>
-        </div>
+        {/* ═══ PRICING ═══ */}
+        <section id="pricing" className="landing__pricing">
+          <div className="landing__container">
+            <div className="landing__section-header landing-animate">
+              <h2 className="landing__section-title">Simple, Affordable Pricing</h2>
+              <p className="landing__section-desc">
+                One plan. Everything local. No subscriptions needed during Ramadan.
+              </p>
+            </div>
 
-        {/* Footer */}
-        <footer className="py-4 md:py-6 text-center">
-          <div className="flex items-center justify-center gap-2 text-text-muted text-xs">
-            <Sparkles className="w-3 h-3 text-accent" />
-            <span>Powered by Gemini AI</span>
+            <div className="landing__pricing-card-wrap landing-animate">
+              <div className="landing__pricing-card">
+                <div className="landing__pricing-badge">Best Value</div>
+
+                <div className="landing__pricing-body">
+                  {/* Header */}
+                  <div className="landing__pricing-header">
+                    <div className="landing__pricing-icon">
+                      <Star fill="currentColor" />
+                    </div>
+                    <div>
+                      <div className="landing__pricing-name">RamaDone Bundle</div>
+                      <div className="landing__pricing-subtitle">Access the complete productivity suite</div>
+                    </div>
+                  </div>
+
+                  {/* Price */}
+                  <div className="landing__pricing-price">
+                    <span className="landing__pricing-amount">$2.99</span>
+                    <span className="landing__pricing-period"> /month</span>
+                    <div className="landing__pricing-free">
+                      <Zap style={{ width: 12, height: 12 }} />
+                      Free during Ramadan 2026 🌙
+                    </div>
+                  </div>
+
+                  {/* Features */}
+                  <ul className="landing__pricing-features">
+                    {PRICING_FEATURES.map((f) => (
+                      <li key={f} className="landing__pricing-feature">
+                        <div className="landing__pricing-check">
+                          <Check />
+                        </div>
+                        <span>{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  {/* Button */}
+                  <button onClick={onSignIn} className="landing__btn-primary" style={{ width: '100%' }}>
+                    <GoogleIcon /> Start Free During Ramadan
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
-          <p className="text-text-muted/50 text-[10px] mt-1">
-            Ramadan Rhythm Scheduler © 2026
-          </p>
+        </section>
+
+        {/* ═══ CTA ═══ */}
+        <section className="landing__cta landing-animate">
+          <div className="landing__container">
+            <h2 className="landing__cta-title">Ready for a better productivity experience?</h2>
+            <p className="landing__cta-desc">
+              Join the new era of intentional living. No cloud trackers, no data harvesting —
+              just you and your goals.
+            </p>
+            <div className="landing__cta-btn">
+              <button onClick={onSignIn} className="landing__btn-primary">
+                <GoogleIcon /> Sign in with Google
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* ═══ FOOTER ═══ */}
+        <footer className="landing__footer">
+          <div className="landing__container landing__footer-inner">
+            <div className="landing__footer-powered">
+              <Sparkles style={{ width: 12, height: 12, color: 'var(--c-accent)' }} />
+              Powered by DeepSeek AI
+            </div>
+            <p className="landing__footer-copy">
+              RamaDone © 2026 — Built for productivity. Optionally blessed. 🌙
+            </p>
+          </div>
         </footer>
       </div>
     </div>
   );
 }
 
-/** Google "G" logo SVG */
+/* ───────── Google "G" Icon ───────── */
 function GoogleIcon() {
   return (
-    <svg className="w-5 h-5" viewBox="0 0 24 24">
-      <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
-      <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-      <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-      <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+    <svg style={{ width: 16, height: 16 }} viewBox="0 0 24 24">
+      <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
+      <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+      <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+      <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
     </svg>
   );
 }
