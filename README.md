@@ -28,13 +28,16 @@ Full income & expense tracking with **custom month navigation** (prev/next arrow
 ### 🎯 Habit Tracker
 Daily/weekly habit tracking with emoji identifiers, category grouping, streak tracking, and completion logs. Habits can be archived (soft-deleted) without losing historical data.
 
+### 🏋️ Gym Tracker
+A comprehensive workout management system enforcing a **program-first workflow**. Easily create workout plans and routines, log reps and weights, and track your fitness history. Features **AI-powered workout parsing** to automatically convert plain text plans into structured routines, and uses a consistent **bottom-tray modal pattern** for a unified user experience.
+
 ### 🕌 Prayer Times
 Auto-fetched prayer times from the [AlAdhan API](https://aladhan.com/prayer-times-api) based on the user's GPS coordinates. Displays Fajr, Sunrise, Dhuhr, Asr, Maghrib (Iftar), and Isha times. Togglable via Settings — non-Muslim users can hide this tab entirely.
 
 ### 🤖 AI Chat Assistant
 A powerful AI chatbot powered by **DeepSeek** (V3 / Reasoner) that can manage **all** of your productivity data through natural conversation:
 
-- **28 AI tools** across 4 domains: Calendar (10 tools), Tasks (4 tools), Expenses (4 tools), Habits (5 tools), plus 5 query/utility tools
+- **31 AI tools** across 5 domains: Calendar (10), Tasks (4), Expenses (4), Habits (5), Gym (3), plus 5 query/utility tools
 - **Multi-turn tool chaining** — AI can chain up to 8 rounds of tool calls per message
 - **Smart fixups** — Automatic correction of misrouted queries (e.g., asking about expenses but AI used `query_events`)
 - **Delete-to-update conversion** — Detects when AI uses delete+add pattern and converts to proper update calls
@@ -201,13 +204,15 @@ The app uses 11 tables across 3 schema versions:
 | `budgets` | `++id` | `category, amount, month` | Monthly budget caps |
 | `habits` | `++id` | `name, emoji, frequency, category, createdAt, archived` | Trackable habits |
 | `habitLogs` | `++id` | `habitId, date, completed, count, note` | Per-day habit completion records |
+| `workoutPlans` | `++id` | `name, type, createdAt, updatedAt` | Gym workout routines/plans |
+| `workoutLogs` | `++id` | `planId, date, startTime, duration` | Logs of completed workouts |
 | `notifications` | `++id` | `type, title, body, scheduledAt, fired, relatedId` | Scheduled notification queue |
 
 > All data is stored **locally** in the browser's IndexedDB. No personal data is sent to external databases.
 
 ---
 
-## 🧭 Navigation (8 Tabs)
+## 🧭 Navigation (9 Tabs)
 
 | Tab | Component | Icon | Location |
 |-----|-----------|------|----------|
@@ -215,6 +220,7 @@ The app uses 11 tables across 3 schema versions:
 | Calendar | `CalendarView` | `Calendar` | Primary (mobile bar) |
 | Tasks | `TasksView` | `CheckSquare` | Primary (mobile bar) |
 | Expenses | `ExpensesView` | `Wallet` | Primary (mobile bar) |
+| Gym | `GymView` | `Dumbbell` | More menu (mobile) |
 | Habits | `HabitsView` | `Target` | More menu (mobile) |
 | Prayers | `PrayersView` | `Clock` | More menu (conditionally shown) |
 | AI Chat | `ChatView` | `MessageCircle` | More menu (mobile) |
@@ -222,7 +228,7 @@ The app uses 11 tables across 3 schema versions:
 
 **Mobile:** Bottom nav bar with 4 primary tabs + a "More" button that opens a slide-up sheet with the remaining tabs.
 
-**Desktop:** Full left sidebar showing all 8 tabs with a moon brand icon at the top.
+**Desktop:** Full left sidebar showing all 9 tabs with a moon brand icon at the top.
 
 The Prayers tab is conditionally shown based on the `prayerMode` preference — it's hidden when Prayer Mode is off.
 
