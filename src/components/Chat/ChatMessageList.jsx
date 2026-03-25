@@ -7,7 +7,7 @@ import InChatTaskCard from './InChatTaskCard';
  * Renders the scrollable list of chat messages (user + assistant bubbles).
  * Handles the loading indicator when AI is thinking.
  */
-export default function ChatMessageList({ messages, loading, scrollRef, onConfirmEvents, onConfirmProductivity }) {
+export default function ChatMessageList({ messages, loading, scrollRef, onConfirmEvents, onConfirmProductivity, activeMode }) {
   return (
     <div ref={scrollRef} className="chat-messages-scroll">
       <div className="chat-messages-inner">
@@ -16,7 +16,10 @@ export default function ChatMessageList({ messages, loading, scrollRef, onConfir
             key={msg.id}
             className={`chat-message-row ${msg.role === 'user' ? 'chat-message-row--user' : ''}`}
           >
-            <div className={`chat-avatar ${msg.role === 'user' ? 'chat-avatar--user' : 'ai-gradient'}`}>
+            <div 
+              className={`chat-avatar ${msg.role === 'user' ? 'chat-avatar--user' : ''}`}
+              style={msg.role !== 'user' ? { background: `var(--color-mode-${activeMode || 'all'})`, color: 'white' } : {}}
+            >
               {msg.role === 'user'
                 ? <User className="w-4 h-4 text-accent" />
                 : <Bot className="w-4 h-4 text-white" />
@@ -53,7 +56,7 @@ export default function ChatMessageList({ messages, loading, scrollRef, onConfir
 
         {loading && (
           <div className="chat-message-row">
-            <div className="chat-avatar ai-gradient">
+            <div className="chat-avatar" style={{ background: `var(--color-mode-${activeMode || 'all'})`, color: 'white' }}>
               <Bot className="w-4 h-4 text-white" />
             </div>
             <div className="chat-bubble chat-bubble--assistant chat-bubble--loading">

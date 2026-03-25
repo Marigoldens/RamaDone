@@ -18,9 +18,16 @@ const DEFAULTS = {
   longitude: 39.8262,
   calcMethod: 2,        // ISNA
   calendarId: null,
-  syncPrayerTimes: false, // Whether to sync daily prayers to Google Calendar
-  ramadanMode: false,     // Ramadan theming, greetings, Iftar/Suhoor context
-  prayerMode: true,       // Prayer times context injected into AI + Prayers tab visible
+  syncPrayerTimes: false,      // Whether to sync daily prayers to Google Calendar
+  ramadanMode: false,          // Ramadan theming, greetings, Iftar/Suhoor context
+  prayerMode: true,            // Prayers tab visible + prayer data loads
+  injectPrayerContext: false,  // Whether prayer times are injected into AI prompts
+  // Sidebar tab visibility (Home + Chat always shown)
+  showTasks: true,
+  showExpenses: true,
+  showHabits: true,
+  showGym: true,
+  showCalendar: true,
 };
 
 /**

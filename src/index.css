@@ -46,6 +46,14 @@
   --color-border: var(--c-border);
   --color-nav-bg: var(--c-nav-bg);
 
+  /* Chat mode colors */
+  --color-mode-all: var(--c-mode-all);
+  --color-mode-calendar: var(--c-mode-calendar);
+  --color-mode-tasks: var(--c-mode-tasks);
+  --color-mode-expenses: var(--c-mode-expenses);
+  --color-mode-habits: var(--c-mode-habits);
+  --color-mode-gym: var(--c-mode-gym);
+
   /* Font family */
   --font-sans: 'Outfit', 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
 
@@ -80,6 +88,13 @@
   --c-iftar-text: #1a1a2e;
   --c-border: #e5ddd0;
   --c-nav-bg: #ffffff;
+  /* Chat mode accent colors — light-friendly */
+  --c-mode-all: #c9a84c;
+  --c-mode-calendar: #4f46e5;
+  --c-mode-tasks: #d97706;
+  --c-mode-expenses: #059669;
+  --c-mode-habits: #db2777;
+  --c-mode-gym: #dc2626;
 }
 
 /* ==========================================
@@ -100,6 +115,13 @@
   --c-iftar-text: #0f172a;
   --c-border: #334155;
   --c-nav-bg: #1e293b;
+  /* Chat mode accent colors — dark-friendly */
+  --c-mode-all: #f59e0b;
+  --c-mode-calendar: #818cf8;
+  --c-mode-tasks: #fbbf24;
+  --c-mode-expenses: #34d399;
+  --c-mode-habits: #f472b6;
+  --c-mode-gym: #f87171;
 }
 
 /* ==========================================
@@ -120,6 +142,13 @@
   --c-iftar-text: #451a03;
   --c-border: #d6d3d1;
   --c-nav-bg: #fffbeb;
+  /* Chat mode accent colors — desert-friendly */
+  --c-mode-all: #d97706;
+  --c-mode-calendar: #7c3aed;
+  --c-mode-tasks: #b45309;
+  --c-mode-expenses: #047857;
+  --c-mode-habits: #be185d;
+  --c-mode-gym: #b91c1c;
 }
 
 /* ==========================================

@@ -7,7 +7,7 @@ export const QUERY_TOOLS = [
   'query_events', 'get_schedule_summary', 'clear_date_range',
   'check_conflicts', 'find_free_slots', 'get_day_narrative',
   'query_tasks', 'query_expenses', 'query_habits',
-  'query_workout_plans', 'query_workout_logs',
+  'query_workout_plans', 'query_workout_logs', 'get_exercise_progression'
 ];
 
 export const PRODUCTIVITY_MUTATIONS = [
@@ -23,7 +23,7 @@ export const FOLLOW_UP_QUERY_TOOLS = [
   'query_events', 'get_schedule_summary', 'check_conflicts',
   'find_free_slots', 'get_day_narrative',
   'query_tasks', 'query_expenses', 'query_habits',
-  'query_workout_plans', 'query_workout_logs',
+  'query_workout_plans', 'query_workout_logs', 'get_exercise_progression'
 ];
 
 /**
@@ -484,6 +484,17 @@ export function getToolDeclarations() {
         },
       },
     },
+    {
+      name: "get_exercise_progression",
+      description: "Get the progression history (weight, reps, estimated 1RM) for a specific exercise over time. Use this to tell the user their PRs or if they are getting stronger.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          exerciseName: { type: "STRING", description: "The name of the exercise, e.g., 'Bench Press'" },
+        },
+        required: ["exerciseName"],
+      },
+    },
   ];
 }
 
@@ -507,7 +518,7 @@ export function getToolsForMode(mode = 'all') {
     expenses: ['add_expense', 'update_expense', 'delete_expense', 'query_expenses'],
     habits:   ['add_habit', 'update_habit', 'delete_habit', 'log_habit', 'query_habits'],
     gym:      ['add_workout_plan', 'update_workout_plan', 'delete_workout_plan', 'query_workout_plans',
-              'add_workout_log', 'delete_workout_log', 'query_workout_logs'],
+              'add_workout_log', 'delete_workout_log', 'query_workout_logs', 'get_exercise_progression'],
   };
 
   const allowed = TOOL_SETS[mode] ?? [];

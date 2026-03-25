@@ -47,7 +47,7 @@ Rules:
 }
 
 // ─── Prayer Time Context ──────────────────────────────────────────────────────
-export async function buildPrayerContext(preferences) {
+export async function buildPrayerContext(preferences, ramadanMode = false) {
   try {
     const { latitude, longitude, calcMethod } = preferences;
     const todayForAlAdhan = format(new Date(), "dd-MM-yyyy");
@@ -66,8 +66,8 @@ Fajr     : ${fmt("Fajr")}
 Sunrise  : ${fmt("Sunrise")}
 Dhuhr    : ${fmt("Dhuhr")}
 Asr      : ${fmt("Asr")}
-Maghrib  : ${fmt("Maghrib")}  ← this is Iftar time
-Isha     : ${fmt("Isha")}
+Maghrib  : ${fmt("Maghrib")}${ramadanMode ? '  ← this is Iftar time' : ''}
+Isha     : ${fmt("Isha")}${ramadanMode ? `
 Tarawih  : ~${fmt("Isha")} + 30 min after Isha (suggest ~${(() => {
       const t = timings["Isha"];
       if (!t) return "20:30";
@@ -76,7 +76,7 @@ Tarawih  : ~${fmt("Isha")} + 30 min after Isha (suggest ~${(() => {
       return `${String(Math.floor(total / 60) % 24).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
     })()})
 
-When the user says "Iftar" use Maghrib time. When they say "Suhoor" suggest ~30–60 min before Fajr.
+When the user says "Iftar" use Maghrib time. When they say "Suhoor" suggest ~30–60 min before Fajr.` : ''}
 === END PRAYER TIMES ===`;
   } catch {
     return "";
@@ -129,7 +129,7 @@ Your capabilities:
 2. **Tasks & to-dos** — add, update, delete, query (add_task, update_task, delete_task, query_tasks)
 3. **Expenses & income** — log, update, delete, query (add_expense, update_expense, delete_expense, query_expenses)
 4. **Habits** — create, update, archive, mark complete/undo, query (add_habit, update_habit, delete_habit, log_habit, query_habits)
-5. **Gym & Workouts** — create/update/delete plans, log workouts, query history (add_workout_plan, update_workout_plan, delete_workout_plan, query_workout_plans, add_workout_log, delete_workout_log, query_workout_logs)
+5. **Gym & Workouts** — create/update/delete plans, log workouts, query history, check exercise progression (add_workout_plan, update_workout_plan, delete_workout_plan, query_workout_plans, add_workout_log, delete_workout_log, query_workout_logs, get_exercise_progression)
 
 ⚠️ TIMEZONE RULE (CRITICAL): ALL times are in the USER'S LOCAL TIME. Do NOT convert to UTC.
 
@@ -140,7 +140,7 @@ Your capabilities:
 - User mentions TASK/TODO/TO-DO → use query_tasks, add_task, update_task, delete_task
 - User mentions HABIT/TRACKER/DAILY GOAL → use query_habits, add_habit, update_habit, delete_habit, log_habit
 - User mentions EVENT/APPOINTMENT/SCHEDULE/PRAYER → use query_events, add_event, update_event, delete_event
-- User mentions WORKOUT/EXERCISE/GYM/REPS/SETS → use query_workout_plans, add_workout_plan, query_workout_logs, add_workout_log
+- User mentions WORKOUT/EXERCISE/GYM/REPS/SETS/PR/WEIGHT TRACKING → use query_workout_plans, add_workout_plan, query_workout_logs, add_workout_log, get_exercise_progression
 - NEVER use query_events to find expenses, tasks, habits, or workouts. They are DIFFERENT data stores.
 
 ⚠️ EDIT RULE (CRITICAL — MUST FOLLOW):
@@ -308,14 +308,14 @@ ${list || '  (no habits yet)'}`;
     return `${greeting} — a gym & workout tracking assistant.
 ${personality}
 
-Tools: add_workout_plan, update_workout_plan, delete_workout_plan, query_workout_plans, add_workout_log, delete_workout_log, query_workout_logs.
+Tools: add_workout_plan, update_workout_plan, delete_workout_plan, query_workout_plans, add_workout_log, delete_workout_log, query_workout_logs, get_exercise_progression.
 
 ${CONFIRM}
 ${EDIT}
 - BATCHING (CRITICAL): If the user asks for a MULTI-DAY split (e.g., 3-day PPL, 4-day Upper/Lower), you MUST output MULTIPLE \`add_workout_plan\` calls simultaneously in ONE response (one call for each day/plan).
 - Plan types: Push, Pull, Legs, Upper, Lower, Full Body, Cardio, Custom.
 - Each plan has exercises with name, sets, reps, targetWeight.
-- Workout logs record completed sessions with exercises and sets (weight + reps).
+- Workout logs record completed sessions with exercises and sets (weight + reps). Use get_exercise_progression to check PRs and strength progress.
 - Call query_workout_plans before update/delete to find the id.
 - Call query_workout_logs before delete_workout_log to find the id.
 

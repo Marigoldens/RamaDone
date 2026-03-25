@@ -257,10 +257,42 @@ export function executeProductivityQuery(callName, callArgs, productivityData) {
       id: l.id, date: (l.date || l.createdAt || '').substring(0, 10),
       planName: l.planName, planId: l.planId,
       exerciseCount: l.exercises?.length ?? 0,
-      exercises: (l.exercises || []).map(e => ({ name: e.name, setCount: e.sets?.length ?? 0 })),
+      exercises: (l.exercises || []).map(e => ({ 
+        name: e.name, 
+        setCount: e.sets?.length ?? 0,
+        sets: (e.sets || []).map(s => ({ weight: s.weight, reps: s.reps }))
+      })),
       notes: l.notes || null,
     }));
     return { logs: slim, total: fl.length, truncated: fl.length > 30 };
+  }
+
+  if (callName === 'get_exercise_progression') {
+    const kw = callArgs.exercise_name?.toLowerCase();
+    if (!kw) return { error: "Missing exercise_name" };
+    
+    // Sort logs oldest to newest
+    const sortedLogs = [...workoutLogs].sort((a, b) => {
+      const d1 = (a.date || a.createdAt || '').substring(0, 10);
+      const d2 = (b.date || b.createdAt || '').substring(0, 10);
+      return d1.localeCompare(d2);
+    });
+
+    const progression = [];
+    sortedLogs.forEach(l => {
+      const ex = l.exercises?.find(e => e.name?.toLowerCase().includes(kw));
+      if (ex) {
+        progression.push({
+          date: (l.date || l.createdAt || '').substring(0, 10),
+          planName: l.planName,
+          sets: (ex.sets || []).map(s => ({ weight: s.weight, reps: s.reps }))
+        });
+      }
+    });
+    
+    // Keep max 20 latest sessions for context limits
+    const latest = progression.slice(-20);
+    return { exercise: callArgs.exercise_name, progression: latest, totalSessions: progression.length, truncated: progression.length > 20 };
   }
 
   return { error: "Unknown productivity query" };

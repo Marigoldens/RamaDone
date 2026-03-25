@@ -6,13 +6,13 @@ import {
 import { usePreferences } from '../../hooks/usePreferences';
 
 const ALL_TABS_BASE = [
-  { id: 'tasks',     label: 'Tasks',    icon: CheckSquare },
-  { id: 'expenses',  label: 'Expenses', icon: Wallet },
+  { id: 'tasks',     label: 'Tasks',    icon: CheckSquare, prefKey: 'showTasks' },
+  { id: 'expenses',  label: 'Expenses', icon: Wallet,      prefKey: 'showExpenses' },
   { id: 'chat',      label: 'Chat',     icon: MessageCircle },
   { id: 'dashboard', label: 'Home',     icon: LayoutDashboard, isFab: true },
-  { id: 'calendar',  label: 'Calendar', icon: Calendar },
-  { id: 'habits',    label: 'Habits',   icon: Target },
-  { id: 'gym',       label: 'Gym',      icon: Dumbbell },
+  { id: 'calendar',  label: 'Calendar', icon: Calendar,    prefKey: 'showCalendar' },
+  { id: 'habits',    label: 'Habits',   icon: Target,      prefKey: 'showHabits' },
+  { id: 'gym',       label: 'Gym',      icon: Dumbbell,    prefKey: 'showGym' },
   { id: 'prayers',   label: 'Prayers',  icon: Clock, prayerOnly: true },
 ];
 
@@ -25,7 +25,11 @@ export default function BottomNav({ activeTab, onTabChange }) {
   const [visible, setVisible] = useState(true);
   const lastDeltaRef = useRef(0);
 
-  const TABS = ALL_TABS_BASE.filter(t => !t.prayerOnly || prefs.prayerMode);
+  const TABS = ALL_TABS_BASE.filter(t => {
+    if (t.prayerOnly && !prefs.prayerMode) return false;
+    if (t.prefKey && prefs[t.prefKey] === false) return false;
+    return true;
+  });
 
   // ── Scroll-hide: listen to wheel (desktop) + touch (mobile) ──
   useEffect(() => {

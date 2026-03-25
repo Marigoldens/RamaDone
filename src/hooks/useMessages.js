@@ -14,10 +14,12 @@ export function useChatSessions() {
     []
   );
 
-  async function createSession(title = 'New Chat') {
+  async function createSession(title = 'New Chat', mode = null) {
     return await db.chatSessions.add({
       title,
       updatedAt: Date.now(),
+      starred: 0,
+      mode: mode || null,
     });
   }
 
@@ -32,7 +34,18 @@ export function useChatSessions() {
     await db.chatSessions.update(id, { title });
   }
 
-  return { sessions, createSession, deleteSession, updateSessionTitle };
+  async function toggleStar(id) {
+    const session = await db.chatSessions.get(id);
+    if (session) {
+      await db.chatSessions.update(id, { starred: session.starred ? 0 : 1 });
+    }
+  }
+
+  async function updateSessionMode(id, mode) {
+    await db.chatSessions.update(id, { mode });
+  }
+
+  return { sessions, createSession, deleteSession, updateSessionTitle, toggleStar, updateSessionMode };
 }
 
 /**

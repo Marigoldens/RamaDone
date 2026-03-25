@@ -338,7 +338,10 @@ Use query_events for any other date.`;
   });
 
   console.log(`Provider: DeepSeek (${selectedModel === 'deepseek-reasoner' ? 'Thinking' : 'Standard'}) | Mode: ${effectiveMode} | Tools: ${tools.length}`);
-  return await chatWithDeepSeek(messages, systemInstruction, tools, selectedModel, lastUserMsg);
+  const result = await chatWithDeepSeek(messages, systemInstruction, tools, selectedModel, lastUserMsg);
+  // Attach the effectiveMode so ChatView can auto-label the session
+  result.effectiveMode = effectiveMode;
+  return result;
 };
 
 // ─── Send Function Results Back to DeepSeek (with multi-turn loop) ────────────

@@ -4,12 +4,13 @@ import { format } from 'date-fns';
 import {
   CheckSquare, Wallet, Target, Clock, Plus, Sparkles,
   TrendingUp, Calendar, ArrowRight, Eye, EyeOff, Settings2,
-  MessageCircle, X, Settings
+  MessageCircle, X, Settings, Dumbbell, Compass
 } from 'lucide-react';
 import db from '../../db/dexie';
+import { usePreferences } from '../../hooks/usePreferences';
 
 const STORAGE_KEY = 'ramadone_dashboard_widgets';
-const DEFAULT_VIS = { tasks: true, expenses: true, habits: true, calendar: true };
+const DEFAULT_VIS = { tasks: true, expenses: true, habits: true, calendar: true, gym: true, prayers: true };
 
 /** Format number as IQD — no decimals, comma-separated */
 const fmtIQD = (n) => Math.round(n).toLocaleString('en-US') + ' IQD';
@@ -20,6 +21,8 @@ const fmtIQD = (n) => Math.round(n).toLocaleString('en-US') + ' IQD';
  */
 export default function DashboardView({ onNavigate }) {
   const today = format(new Date(), 'yyyy-MM-dd');
+  const { getPref } = usePreferences();
+  const prayerMode = getPref('prayerMode');
 
   // ─── Widget visibility ───
   const [widgetVis, setWidgetVis] = useState(() => {
@@ -80,11 +83,44 @@ export default function DashboardView({ onNavigate }) {
   const habitsNotDone = allHabits.filter(h => !completedIdSet.has(h.id));
   const habitPct = allHabits.length > 0 ? Math.round((habitsChecked / allHabits.length) * 100) : 0;
 
-  // ─── Calendar data ───
   const todayEvents = useLiveQuery(
     () => db.events.where('date').equals(today).toArray(), [today]
   ) ?? [];
   const nextEvent = todayEvents.sort((a, b) => (a.start || '').localeCompare(b.start || ''))[0];
+
+  // ─── Prayer data ───
+  const todayPrayers = useLiveQuery(() => db.prayerTimes.get(today), [today]);
+  
+  const nextPrayer = useMemo(() => {
+    if (!todayPrayers) return null;
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    
+    const prayerNames = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
+    for (const p of prayerNames) {
+      const timeStr = todayPrayers[p];
+      if (timeStr) {
+        // Simple approx parsing (assumes HH:MM 24h format for simplicity or standard string)
+        const [h, m] = timeStr.split(':').map(Number);
+        if (h * 60 + m > currentMinutes) {
+          return { name: p, time: timeStr };
+        }
+      }
+    }
+    return { name: 'isha', time: todayPrayers.isha || '--:--' };
+  }, [todayPrayers]);
+
+  // ─── Gym data ───
+  const lastWorkout = useLiveQuery(() => db.workoutLogs.orderBy('date').reverse().first());
+  
+  const weekAgo = new Date();
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  const weekAgoStr = format(weekAgo, 'yyyy-MM-dd');
+  
+  const weeklyWorkouts = useLiveQuery(
+    () => db.workoutLogs.where('date').aboveOrEqual(weekAgoStr).toArray(),
+    [weekAgoStr]
+  ) ?? [];
 
   const greeting = getGreeting();
 
@@ -143,6 +179,8 @@ export default function DashboardView({ onNavigate }) {
                 { key: 'expenses', label: 'Expenses', icon: <Wallet className="w-4 h-4" />,     color: '#10b981' },
                 { key: 'habits',   label: 'Habits',   icon: <Target className="w-4 h-4" />,     color: '#8b5cf6' },
                 { key: 'calendar', label: 'Calendar', icon: <Calendar className="w-4 h-4" />,   color: 'var(--c-accent)' },
+                ...(prayerMode ? [{ key: 'prayers', label: 'Prayers', icon: <Compass className="w-4 h-4" />, color: '#14b8a6' }] : []),
+                { key: 'gym', label: 'Gym', icon: <Dumbbell className="w-4 h-4" />, color: '#f97316' },
               ].map(w => (
                 <div key={w.key} className="dash-toggle-row">
                   <div className="dash-toggle-row__info">
@@ -308,6 +346,56 @@ export default function DashboardView({ onNavigate }) {
                 <span className="text-[11px] text-text-muted">
                   Next: <strong className="text-text font-semibold">{nextEvent.title}</strong>
                   {nextEvent.start && <span className="ml-1 text-accent font-mono text-[10px]">{nextEvent.start}</span>}
+                </span>
+              </div>
+            )}
+          </button>
+        )}
+
+        {/* ── Prayers Widget ── */}
+        {widgetVis.prayers && prayerMode && (
+          <button onClick={() => onNavigate('prayers')} className="dashboard-widget dashboard-widget--prayers">
+            <div className="dashboard-widget__header">
+              <div className="dashboard-widget__icon-wrap dashboard-widget__icon-wrap--teal" style={{background: 'rgba(20, 184, 166, 0.15)', color: '#14b8a6'}}>
+                <Compass className="w-4 h-4" />
+              </div>
+              <span className="dashboard-widget__label">Prayers</span>
+              <ArrowRight className="w-3.5 h-3.5 text-text-muted ml-auto opacity-0 group-hover:opacity-100" />
+            </div>
+            <div className="dashboard-widget__body">
+              {nextPrayer ? (
+                <>
+                  <span className="dashboard-widget__number capitalize">{nextPrayer.name}</span>
+                  <span className="dashboard-widget__subtitle">{nextPrayer.time}</span>
+                </>
+              ) : (
+                <>
+                  <span className="dashboard-widget__number">--:--</span>
+                  <span className="dashboard-widget__subtitle">No prayer data</span>
+                </>
+              )}
+            </div>
+          </button>
+        )}
+
+        {/* ── Gym Widget ── */}
+        {widgetVis.gym && (
+          <button onClick={() => onNavigate('gym')} className="dashboard-widget dashboard-widget--gym">
+            <div className="dashboard-widget__header">
+              <div className="dashboard-widget__icon-wrap dashboard-widget__icon-wrap--orange" style={{background: 'rgba(249, 115, 22, 0.15)', color: '#f97316'}}>
+                <Dumbbell className="w-4 h-4" />
+              </div>
+              <span className="dashboard-widget__label">Gym</span>
+              <ArrowRight className="w-3.5 h-3.5 text-text-muted ml-auto opacity-0 group-hover:opacity-100" />
+            </div>
+            <div className="dashboard-widget__body">
+              <span className="dashboard-widget__number">{weeklyWorkouts.length}</span>
+              <span className="dashboard-widget__subtitle">sessions this week</span>
+            </div>
+            {lastWorkout && (
+              <div className="dashboard-widget__footer">
+                <span className="text-[11px] text-text-muted">
+                  Last: <strong className="text-text font-semibold">{lastWorkout.date}</strong>
                 </span>
               </div>
             )}

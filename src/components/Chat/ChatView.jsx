@@ -27,7 +27,7 @@ export default function ChatView({ user, accessToken }) {
   // ── Chat mode state ── ('all' → auto-detect; explicit → scoped)
   const [chatMode, setChatMode] = useState('all');
 
-  const { createSession } = useChatSessions();
+  const { sessions, createSession, updateSessionMode } = useChatSessions();
   const { messages, sendMessage, updateMessageData } = useMessages(activeSessionId);
 
   const todayDate = format(new Date(), 'yyyy-MM-dd');
@@ -46,6 +46,7 @@ export default function ChatView({ user, accessToken }) {
 
   const ramadanMode = preferences?.ramadanMode ?? false;
   const prayerMode  = preferences?.prayerMode  ?? true;
+  const injectPrayerContext = preferences?.injectPrayerContext ?? false;
 
   // ── Prayer times ──
   const [prayerTimes, setPrayerTimes] = useState(null);
@@ -69,7 +70,7 @@ export default function ChatView({ user, accessToken }) {
         const tarawihTime = ishaTime
           ? `${String(Math.floor((ishaTime.hours * 60 + ishaTime.minutes + 30) / 60) % 24).padStart(2, '0')}:${String((ishaTime.hours * 60 + ishaTime.minutes + 30) % 60).padStart(2, '0')}`
           : '20:30';
-        const prayerBlock = `=== TODAY'S PRAYER TIMES ===\nFajr: ${fmt('Fajr')} | Dhuhr: ${fmt('Dhuhr')} | Asr: ${fmt('Asr')} | Maghrib (Iftar): ${fmt('Maghrib')} | Isha: ${fmt('Isha')} | Tarawih: ~${tarawihTime}\nWhen user says "Iftar" → use Maghrib time. "Suhoor" → 30-60 min before Fajr.\n=== END PRAYER TIMES ===`;
+        const prayerBlock = `=== TODAY'S PRAYER TIMES ===\nFajr: ${fmt('Fajr')} | Dhuhr: ${fmt('Dhuhr')} | Asr: ${fmt('Asr')} | Maghrib${ramadanMode ? ' (Iftar)' : ''}: ${fmt('Maghrib')} | Isha: ${fmt('Isha')}${ramadanMode ? ` | Tarawih: ~${tarawihTime}\nWhen user says "Iftar" → use Maghrib time. "Suhoor" → 30-60 min before Fajr.` : ''}\n=== END PRAYER TIMES ===`;
         setPrayerTimes(prayerBlock);
       } catch (err) {
         console.warn('Could not fetch prayer times:', err.message);
@@ -173,16 +174,28 @@ export default function ChatView({ user, accessToken }) {
     try {
       let currentSessionId = activeSessionId;
       if (!currentSessionId) {
+        // chatMode is the mode bar selection before any session exists
+        const effectiveModeForNewSession = chatMode;
         const title = textToSubmit.split(' ').slice(0, 4).join(' ') + '...';
-        currentSessionId = await createSession(title);
+        currentSessionId = await createSession(title, effectiveModeForNewSession);
         setActiveSessionId(currentSessionId);
       }
 
       await sendMessage('user', textToSubmit, {}, currentSessionId);
 
       const currentMessages = [...(messages || []), { role: 'user', content: textToSubmit }];
-      // Pass chatMode — aiService auto-detects domain when chatMode is 'all'
-      let aiResponse = await chatWithAI(currentMessages, allEvents, preferences, prayerTimes, productivityData, chatMode);
+      // Pass currentMode (session mode or bar selection) — aiService auto-detects domain when mode is 'all'
+      let aiResponse = await chatWithAI(currentMessages, allEvents, preferences, injectPrayerContext ? prayerTimes : null, productivityData, currentMode);
+
+      // ── Auto-categorize session based on detected domain ──────────────────
+      // If the session is uncategorized ('all') and the AI detected a specific
+      // domain (e.g. 'expenses', 'calendar'), label the session with that mode.
+      if (aiResponse.effectiveMode && aiResponse.effectiveMode !== 'all') {
+        const sess = sessions?.find(s => s.id === currentSessionId);
+        if (!sess?.mode || sess.mode === 'all') {
+          await updateSessionMode(currentSessionId, aiResponse.effectiveMode);
+        }
+      }
 
       // ── Handle function calls ──────────────────────────────────────────────
       if (aiResponse.isFunctionCall) {
@@ -345,6 +358,26 @@ export default function ChatView({ user, accessToken }) {
   const showEmptyState = !activeSessionId || !messages?.length;
 
   // ── Render ──────────────────────────────────────────────────────────────────
+  const activeSession = sessions?.find(s => s.id === activeSessionId);
+  // currentMode = session's saved mode when a session is active, else the bar selection
+  const currentMode = activeSessionId ? (activeSession?.mode || 'all') : chatMode;
+
+  // ── Sync local chatMode when switching sessions ──
+  useEffect(() => {
+    if (activeSessionId && activeSession) {
+      setChatMode(activeSession.mode || 'all');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSessionId]);
+
+  // ── Handle mode change: update local state + persist to active session ──
+  const handleModeChange = async (newMode) => {
+    setChatMode(newMode);
+    if (activeSessionId) {
+      await updateSessionMode(activeSessionId, newMode);
+    }
+  };
+
   return (
     <div className="chat-root">
       {/* Sidebar */}
@@ -353,6 +386,8 @@ export default function ChatView({ user, accessToken }) {
         onSelectSession={setActiveSessionId}
         isMobileOpen={isSidebarOpen}
         onCloseMobile={() => setIsSidebarOpen(false)}
+        activeChatMode={chatMode}
+        onNewChat={() => { setActiveSessionId(null); }}
       />
 
       {/* Main Area */}
@@ -367,22 +402,22 @@ export default function ChatView({ user, accessToken }) {
             >
               <Menu className="w-5 h-5" />
             </button>
-            <div className="chat-header-icon ai-gradient">
+            <div className="chat-header-icon" style={{ background: `var(--color-mode-${currentMode || 'all'})` }}>
               <Moon className="w-4 h-4 text-white" />
             </div>
             <div>
               <h1 className="chat-header-title">{ramadanMode ? 'Ramadan AI' : 'RamaDone AI'}</h1>
-              <p className="chat-header-subtitle">Powered by DeepSeek</p>
+              <p className="chat-header-subtitle" style={{ color: `var(--color-mode-${currentMode || 'all'})`, opacity: 0.8 }}>Powered by DeepSeek</p>
             </div>
           </div>
           <div className="chat-status-pill">
-            <span className="chat-status-dot" />
+            <span className="chat-status-dot" style={{ backgroundColor: `var(--color-mode-${currentMode || 'all'})` }} />
             <span>Online</span>
           </div>
         </header>
 
         {/* Mode selector bar */}
-        <ChatModeBar activeMode={chatMode} onModeChange={setChatMode} />
+        <ChatModeBar activeMode={currentMode} onModeChange={handleModeChange} />
 
         {/* Messages / empty state */}
         {showEmptyState ? (
@@ -402,6 +437,7 @@ export default function ChatView({ user, accessToken }) {
             scrollRef={scrollRef}
             onConfirmEvents={handleConfirmEvents}
             onConfirmProductivity={handleConfirmProductivity}
+            activeMode={currentMode}
           />
         )}
 
@@ -413,6 +449,7 @@ export default function ChatView({ user, accessToken }) {
           onSend={handleSend}
           inputRef={inputRef}
           ramadanMode={ramadanMode}
+          activeMode={currentMode}
         />
       </div>
     </div>

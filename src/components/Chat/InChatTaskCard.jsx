@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, CheckSquare, Wallet, Target, Trash2, RefreshCw, Edit3 } from 'lucide-react';
+import { CheckCircle2, CheckSquare, Wallet, Target, Trash2, RefreshCw, Edit3, Dumbbell } from 'lucide-react';
 import './InChatTaskCard.css';
 
 // Maps tool name → icon + label colour
@@ -14,6 +14,11 @@ const TOOL_META = {
   update_habit:   { Icon: Edit3,       color: 'var(--color-warning)',  label: 'Edit'   },
   delete_habit:   { Icon: Trash2,      color: 'var(--color-danger)',   label: 'Archive'},
   log_habit:      { Icon: Target,      color: 'var(--color-accent)',   label: 'Habit'  },
+  add_workout_plan:    { Icon: Dumbbell, color: 'var(--color-success)',  label: 'Create' },
+  update_workout_plan: { Icon: Edit3,    color: 'var(--color-warning)',  label: 'Update' },
+  delete_workout_plan: { Icon: Trash2,   color: 'var(--color-danger)',   label: 'Delete' },
+  add_workout_log:     { Icon: Dumbbell, color: 'var(--color-success)',  label: 'Log'    },
+  delete_workout_log:  { Icon: Trash2,   color: 'var(--color-danger)',   label: 'Delete' },
 };
 
 /**

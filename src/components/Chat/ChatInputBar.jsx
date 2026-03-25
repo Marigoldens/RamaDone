@@ -4,7 +4,7 @@ import { Send } from 'lucide-react';
  * The text input bar at the bottom of the chat.
  * Handles text entry and keyboard submission.
  */
-export default function ChatInputBar({ input, setInput, loading, onSend, inputRef, ramadanMode }) {
+export default function ChatInputBar({ input, setInput, loading, onSend, inputRef, ramadanMode, activeMode }) {
   return (
     <div className="chat-input-area">
       <div className="chat-input-wrap">
@@ -21,7 +21,8 @@ export default function ChatInputBar({ input, setInput, loading, onSend, inputRe
         <button
           onClick={onSend}
           disabled={!input.trim() || loading}
-          className="chat-send-btn ai-gradient"
+          className="chat-send-btn"
+          style={{ background: `var(--color-mode-${activeMode || 'all'})`, color: 'white' }}
           aria-label="Send message"
         >
           <Send className="w-4 h-4 text-white" />

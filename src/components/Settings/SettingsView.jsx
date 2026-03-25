@@ -2,7 +2,8 @@ import React from 'react';
 import {
   LogOut, MapPin, Clock, AlertTriangle, User,
   Palette, Globe, Brain, Database, Settings as SettingsIcon,
-  ChevronRight, ShieldCheck, Check, Moon
+  ChevronRight, ShieldCheck, Check, Moon, LayoutDashboard,
+  CheckSquare, Wallet, Target, Calendar, Dumbbell
 } from 'lucide-react';
 import { usePreferences } from '../../hooks/usePreferences';
 import { THEMES } from '../../config/theme';
@@ -203,6 +204,54 @@ export default function SettingsView({ user, onSignOut }) {
                 >
                   {prefs.prayerMode ? '🕌 Prayer Times: On' : '⏰ Prayer Times: Off'}
                 </button>
+              </div>
+
+              {/* Inject prayer context into AI (sub-toggle) */}
+              {prefs.prayerMode && (
+                <div className="settings-toggle-row" style={{ marginTop: '0.5rem' }}>
+                  <button
+                    onClick={() => setPref('injectPrayerContext', !prefs.injectPrayerContext)}
+                    className={`settings-toggle-btn ${prefs.injectPrayerContext ? 'settings-toggle-btn--active' : ''}`}
+                    style={{ width: '100%', padding: '0.625rem', fontSize: '0.8125rem' }}
+                  >
+                    {prefs.injectPrayerContext ? '🤖 Prayer times injected into AI: On' : '🤖 Prayer times injected into AI: Off'}
+                  </button>
+                  <p style={{ fontSize: '0.6875rem', color: 'var(--c-text-muted)', marginTop: '0.375rem' }}>
+                    When on, the AI will know today's prayer times and can schedule around them.
+                  </p>
+                </div>
+              )}
+            </section>
+
+            {/* ── SIDEBAR TABS VISIBILITY ─── */}
+            <section className="settings-card">
+              <div className="settings-section-header">
+                <div className="settings-section-icon" style={{ backgroundColor: 'rgba(168, 85, 247, 0.1)', color: '#a855f7' }}>
+                  <LayoutDashboard size={18} />
+                </div>
+                <div>
+                  <h2 className="settings-section-title">Sidebar Tabs</h2>
+                  <p className="settings-section-subtitle">Choose which tabs appear in the bottom navigation. Home &amp; Chat are always visible.</p>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginTop: '0.75rem' }}>
+                {[
+                  { key: 'showTasks',    label: 'Tasks',    icon: CheckSquare },
+                  { key: 'showExpenses', label: 'Expenses', icon: Wallet },
+                  { key: 'showCalendar', label: 'Calendar', icon: Calendar },
+                  { key: 'showHabits',   label: 'Habits',   icon: Target },
+                  { key: 'showGym',      label: 'Gym',      icon: Dumbbell },
+                ].map(tab => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setPref(tab.key, !prefs[tab.key])}
+                    className={`settings-toggle-btn ${prefs[tab.key] !== false ? 'settings-toggle-btn--active' : ''}`}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.625rem', justifyContent: 'center' }}
+                  >
+                    <tab.icon size={14} />
+                    <span>{tab.label}</span>
+                  </button>
+                ))}
               </div>
             </section>
 

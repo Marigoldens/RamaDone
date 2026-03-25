@@ -21,7 +21,7 @@ export default function ChatEmptyState({ activeMode, ramadanMode, onSendSuggesti
 
   return (
     <div className="chat-empty">
-      <div className="chat-empty-icon ai-gradient">
+      <div className="chat-empty-icon" style={{ background: `var(--color-mode-${activeMode || 'all'})` }}>
         <Sparkles className="w-8 h-8 text-white" />
       </div>
       <h2 className="chat-empty-title">{greeting}</h2>

@@ -100,4 +100,27 @@ db.version(7).stores({
   workoutLogs: '++id, date, planId, duration, createdAt',
 });
 
+/**
+ * Version 8: Chat enhancements — starring & mode tracking.
+ *
+ * CHANGES:
+ * - chatSessions: added `starred` (boolean) and `mode` (chat mode string) indexes
+ *   so we can quickly filter starred chats and color-code by mode.
+ */
+db.version(8).stores({
+  chatSessions: '++id, title, updatedAt, starred, mode',
+  messages: '++id, sessionId, role, timestamp',
+  events: '++id, googleId, title, start, end, type, date, synced, updatedAt, deleted',
+  preferences: 'key',
+  prayerTimes: 'date',
+  tasks: '++id, title, status, priority, dueDate, category, createdAt, updatedAt, completed',
+  expenses: '++id, amount, type, category, date, note, recurring, createdAt',
+  budgets: '++id, category, amount, month',
+  habits: '++id, name, emoji, frequency, category, createdAt, archived',
+  habitLogs: '++id, habitId, date, completed, count, note',
+  notifications: '++id, type, title, body, scheduledAt, fired, relatedId',
+  workoutPlans: '++id, name, type, createdAt, updatedAt',
+  workoutLogs: '++id, date, planId, duration, createdAt',
+});
+
 export default db;
