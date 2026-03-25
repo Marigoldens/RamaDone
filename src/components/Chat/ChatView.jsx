@@ -188,9 +188,10 @@ export default function ChatView({ user, accessToken }) {
       let aiResponse = await chatWithAI(currentMessages, allEvents, preferences, injectPrayerContext ? prayerTimes : null, productivityData, currentMode);
 
       // ── Auto-categorize session based on detected domain ──────────────────
-      // If the session is uncategorized ('all') and the AI detected a specific
-      // domain (e.g. 'expenses', 'calendar'), label the session with that mode.
-      if (aiResponse.effectiveMode && aiResponse.effectiveMode !== 'all') {
+      // Only fires when the user is in 'all' (auto) mode — if they explicitly
+      // picked a mode (chatMode !== 'all') we NEVER override their choice.
+      const userPickedMode = chatMode !== 'all';
+      if (!userPickedMode && aiResponse.effectiveMode && aiResponse.effectiveMode !== 'all') {
         const sess = sessions?.find(s => s.id === currentSessionId);
         if (!sess?.mode || sess.mode === 'all') {
           await updateSessionMode(currentSessionId, aiResponse.effectiveMode);
@@ -359,23 +360,23 @@ export default function ChatView({ user, accessToken }) {
 
   // ── Render ──────────────────────────────────────────────────────────────────
   const activeSession = sessions?.find(s => s.id === activeSessionId);
-  // currentMode = session's saved mode when a session is active, else the bar selection
-  const currentMode = activeSessionId ? (activeSession?.mode || 'all') : chatMode;
 
-  // ── Sync local chatMode when switching sessions ──
+  // currentMode = what the AI uses for routing (the bar selection, chatMode).
+  // The session's saved .mode is purely a display label in the sidebar — it
+  // is set once by auto-detection and is NEVER changed by the mode bar.
+  const currentMode = chatMode;
+
+  // ── When switching to a different session, reset bar to 'all' ──
+  // (The bar is ephemeral per-session context, not tied to the saved label)
   useEffect(() => {
-    if (activeSessionId && activeSession) {
-      setChatMode(activeSession.mode || 'all');
-    }
+    setChatMode('all');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSessionId]);
 
-  // ── Handle mode change: update local state + persist to active session ──
-  const handleModeChange = async (newMode) => {
+  // ── Handle mode change: local state only, never writes to DB ──
+  // The mode bar is a temporary AI routing hint. It does not relabel the session.
+  const handleModeChange = (newMode) => {
     setChatMode(newMode);
-    if (activeSessionId) {
-      await updateSessionMode(activeSessionId, newMode);
-    }
   };
 
   return (

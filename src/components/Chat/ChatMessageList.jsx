@@ -63,6 +63,7 @@ export default function ChatMessageList({ messages, loading, scrollRef, onConfir
               <span className="chat-dot chat-dot-1" />
               <span className="chat-dot chat-dot-2" />
               <span className="chat-dot chat-dot-3" />
+              <span className="chat-loading-text">Thinking…</span>
             </div>
           </div>
         )}
