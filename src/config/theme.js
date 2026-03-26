@@ -33,6 +33,48 @@ export const THEMES = [
     className: 'theme-desert',
     description: 'Rich sand and gold tones',
   },
+  {
+    id: 'ocean',
+    name: 'Ocean Blue',
+    emoji: '🌊',
+    className: 'theme-ocean',
+    description: 'Cool oceanic blues and teals',
+  },
+  {
+    id: 'forest',
+    name: 'Forest Green',
+    emoji: '🌲',
+    className: 'theme-forest',
+    description: 'Natural greens and earthy tones',
+  },
+  {
+    id: 'rose',
+    name: 'Rose Garden',
+    emoji: '🌸',
+    className: 'theme-rose',
+    description: 'Soft pinks and romantic hues',
+  },
+  {
+    id: 'midnight',
+    name: 'Midnight Purple',
+    emoji: '🔮',
+    className: 'theme-midnight',
+    description: 'Deep purples and mystical dark mode',
+  },
+  {
+    id: 'arctic',
+    name: 'Arctic Frost',
+    emoji: '❄️',
+    className: 'theme-arctic',
+    description: 'Icy blues and crisp whites',
+  },
+  {
+    id: 'sunset',
+    name: 'Sunset Glow',
+    emoji: '🌅',
+    className: 'theme-sunset',
+    description: 'Warm oranges and coral skies',
+  },
 ];
 
 /**

@@ -16,6 +16,7 @@ export const PRODUCTIVITY_MUTATIONS = [
   'add_habit', 'update_habit', 'delete_habit', 'log_habit',
   'add_workout_plan', 'update_workout_plan', 'delete_workout_plan',
   'add_workout_log', 'delete_workout_log',
+  'generate_monthly_report',
 ];
 
 // Used in the follow-up loop — tools that can be executed locally without user confirmation
@@ -495,6 +496,20 @@ export function getToolDeclarations() {
         required: ["exerciseName"],
       },
     },
+
+    // ── Monthly Report tools ─────────────────────────────────────────────
+    {
+      name: "generate_monthly_report",
+      description: "Generate a detailed AI-analyzed monthly expense report and save it to the app. The report includes spending breakdown by category, trends, insights, and recommendations.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          month: { type: "STRING", description: "Month in YYYY-MM format, e.g., '2026-03'" },
+          title: { type: "STRING", description: "Optional custom title for the report" },
+        },
+        required: ["month"],
+      },
+    },
   ];
 }
 
@@ -515,7 +530,7 @@ export function getToolsForMode(mode = 'all') {
       'get_day_narrative', 'repeat_event', 'get_schedule_summary', 'clear_date_range',
     ],
     tasks:    ['add_task', 'update_task', 'delete_task', 'query_tasks'],
-    expenses: ['add_expense', 'update_expense', 'delete_expense', 'query_expenses'],
+    expenses: ['add_expense', 'update_expense', 'delete_expense', 'query_expenses', 'generate_monthly_report'],
     habits:   ['add_habit', 'update_habit', 'delete_habit', 'log_habit', 'query_habits'],
     gym:      ['add_workout_plan', 'update_workout_plan', 'delete_workout_plan', 'query_workout_plans',
               'add_workout_log', 'delete_workout_log', 'query_workout_logs', 'get_exercise_progression'],

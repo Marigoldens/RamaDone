@@ -1,16 +1,25 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   LogOut, MapPin, Clock, AlertTriangle, User,
   Palette, Globe, Brain, Database, Settings as SettingsIcon,
   ChevronRight, ShieldCheck, Check, Moon, LayoutDashboard,
-  CheckSquare, Wallet, Target, Calendar, Dumbbell
+  CheckSquare, Wallet, Target, Calendar, Dumbbell, Hand, Crown, Sparkles
 } from 'lucide-react';
 import { usePreferences } from '../../hooks/usePreferences';
 import { THEMES } from '../../config/theme';
+import { isPro } from '../../config/admin';
 import db from '../../db/dexie';
 
 export default function SettingsView({ user, onSignOut }) {
   const { prefs, setPref } = usePreferences();
+  const [subscription, setSubscription] = useState('free');
+
+  // Check subscription from user claims (no API call)
+  useEffect(() => {
+    if (isPro(user)) {
+      setSubscription('pro');
+    }
+  }, [user]);
 
   const handleResetData = async () => {
     if (window.confirm('Are you sure? This will delete all local history and settings.')) {
@@ -58,7 +67,9 @@ export default function SettingsView({ user, onSignOut }) {
               <h2 className="settings-profile-name">{user?.displayName || 'Faithful Member'}</h2>
               <p className="settings-profile-email">{user?.email}</p>
               <div className="settings-profile-tags">
-                <span className="settings-tag settings-tag--muted">Free Plan</span>
+                <span className={`settings-tag ${subscription === 'pro' ? 'settings-tag--gold' : 'settings-tag--muted'}`}>
+                  {subscription === 'pro' ? 'Pro Plan' : 'Free Plan'}
+                </span>
                 <span className="settings-tag settings-tag--green">Active</span>
               </div>
             </div>
@@ -82,24 +93,27 @@ export default function SettingsView({ user, onSignOut }) {
               </div>
 
               <div className="settings-theme-grid">
-                {THEMES.map((theme) => (
-                  <button
-                    key={theme.id}
-                    onClick={() => setPref('theme', theme.id)}
-                    className={`settings-theme-card ${prefs.theme === theme.id ? 'settings-theme-card--active' : ''}`}
-                  >
-                    <div className="settings-theme-card__top">
-                      <span className="settings-theme-card__emoji">{theme.emoji}</span>
-                      {prefs.theme === theme.id && (
-                        <div className="settings-theme-card__check">
-                          <Check size={12} />
-                        </div>
-                      )}
-                    </div>
-                    <span className="settings-theme-card__name">{theme.name}</span>
-                    <span className="settings-theme-card__sub">Visual style</span>
-                  </button>
-                ))}
+                {THEMES.map((theme) => {
+                  const isSelected = (prefs.theme || 'default') === theme.id;
+                  return (
+                    <button
+                      key={theme.id}
+                      onClick={() => setPref('theme', theme.id)}
+                      className={`settings-theme-card ${isSelected ? 'settings-theme-card--active' : ''}`}
+                    >
+                      <div className="settings-theme-card__top">
+                        <span className="settings-theme-card__emoji">{theme.emoji}</span>
+                        {isSelected && (
+                          <div className="settings-theme-card__check">
+                            <Check size={12} />
+                          </div>
+                        )}
+                      </div>
+                      <span className="settings-theme-card__name">{theme.name}</span>
+                      <span className="settings-theme-card__sub">Visual style</span>
+                    </button>
+                  );
+                })}
               </div>
             </section>
 
@@ -115,15 +129,18 @@ export default function SettingsView({ user, onSignOut }) {
                   <h2 className="settings-section-title">Time Format</h2>
                 </div>
                 <div className="settings-toggle-row">
-                  {['12h', '24h'].map(fmt => (
-                    <button
-                      key={fmt}
-                      onClick={() => setPref('timeFormat', fmt)}
-                      className={`settings-toggle-btn ${prefs.timeFormat === fmt ? 'settings-toggle-btn--active' : ''}`}
-                    >
-                      {fmt} Format
-                    </button>
-                  ))}
+                  {['12h', '24h'].map(fmt => {
+                    const isSelected = (prefs.timeFormat || '12h') === fmt;
+                    return (
+                      <button
+                        key={fmt}
+                        onClick={() => setPref('timeFormat', fmt)}
+                        className={`settings-toggle-btn ${isSelected ? 'settings-toggle-btn--active' : ''}`}
+                      >
+                        {fmt} Format
+                      </button>
+                    );
+                  })}
                 </div>
               </section>
 
@@ -250,6 +267,35 @@ export default function SettingsView({ user, onSignOut }) {
                   >
                     <tab.icon size={14} />
                     <span>{tab.label}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            {/* ── HANDEDNESS ─── */}
+            <section className="settings-card">
+              <div className="settings-section-header">
+                <div className="settings-section-icon" style={{ backgroundColor: 'rgba(34, 197, 94, 0.1)', color: '#22c55e' }}>
+                  <Hand size={18} />
+                </div>
+                <div>
+                  <h2 className="settings-section-title">Handedness</h2>
+                  <p className="settings-section-subtitle">Position the Home button for easier thumb reach on mobile.</p>
+                </div>
+              </div>
+              <div className="settings-toggle-row" style={{ marginTop: '0.5rem' }}>
+                {[
+                  { id: 'left', label: 'Left-handed', sub: 'Home on left' },
+                  { id: 'right', label: 'Right-handed', sub: 'Home on right' },
+                ].map(hand => (
+                  <button
+                    key={hand.id}
+                    onClick={() => setPref('handedness', hand.id)}
+                    className={`settings-toggle-btn ${(prefs.handedness || 'right') === hand.id ? 'settings-toggle-btn--active' : ''}`}
+                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.125rem' }}
+                  >
+                    <span>{hand.label}</span>
+                    <span style={{ fontSize: '0.6875rem', opacity: 0.6 }}>{hand.sub}</span>
                   </button>
                 ))}
               </div>

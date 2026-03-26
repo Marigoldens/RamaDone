@@ -12,6 +12,16 @@ dist
 dist-ssr
 *.local
 
+# Environment variables - CRITICAL: Never commit these
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+
+# Firebase
+.firebase/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

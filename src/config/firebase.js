@@ -12,6 +12,8 @@
  */
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
+import { getFunctions } from 'firebase/functions';
 import { getAnalytics } from 'firebase/analytics';
 
 /** Firebase project configuration — using the keys provided */
@@ -36,6 +38,12 @@ if (typeof window !== 'undefined' && firebaseConfig.measurementId) {
 
 /** Firebase Auth instance — used across the app for auth state */
 export const auth = getAuth(app);
+
+/** Firestore instance — for server-side user tracking */
+export const firestore = getFirestore(app);
+
+/** Cloud Functions instance — for secure server operations */
+export const functions = getFunctions(app);
 
 /**
  * Google Auth Provider configured with the Calendar API scope.

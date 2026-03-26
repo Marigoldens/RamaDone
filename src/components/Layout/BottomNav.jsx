@@ -1,33 +1,37 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   LayoutDashboard, Calendar, CheckSquare, Wallet,
-  Target, Clock, MessageCircle, Settings, Dumbbell
+  Target, Clock, MessageCircle, Settings, Dumbbell, Shield
 } from 'lucide-react';
 import { usePreferences } from '../../hooks/usePreferences';
+import { isAdmin } from '../../config/admin';
 
 const ALL_TABS_BASE = [
+  { id: 'dashboard', label: 'Home',     icon: LayoutDashboard, isFab: true },
   { id: 'tasks',     label: 'Tasks',    icon: CheckSquare, prefKey: 'showTasks' },
   { id: 'expenses',  label: 'Expenses', icon: Wallet,      prefKey: 'showExpenses' },
   { id: 'chat',      label: 'Chat',     icon: MessageCircle },
-  { id: 'dashboard', label: 'Home',     icon: LayoutDashboard, isFab: true },
   { id: 'calendar',  label: 'Calendar', icon: Calendar,    prefKey: 'showCalendar' },
   { id: 'habits',    label: 'Habits',   icon: Target,      prefKey: 'showHabits' },
   { id: 'gym',       label: 'Gym',      icon: Dumbbell,    prefKey: 'showGym' },
   { id: 'prayers',   label: 'Prayers',  icon: Clock, prayerOnly: true },
+  { id: 'admin',     label: 'Admin',    icon: Shield,    adminOnly: true },
 ];
 
 /**
  * Slim bottom nav — shows all icons, no More button.
  * Hides on scroll-down, reappears on scroll-up.
  */
-export default function BottomNav({ activeTab, onTabChange }) {
-  const { prefs } = usePreferences();
+export default function BottomNav({ activeTab, onTabChange, user }) {
+  const { prefs, getPref } = usePreferences();
+  const handedness = getPref('handedness');
   const [visible, setVisible] = useState(true);
   const lastDeltaRef = useRef(0);
 
   const TABS = ALL_TABS_BASE.filter(t => {
     if (t.prayerOnly && !prefs.prayerMode) return false;
     if (t.prefKey && prefs[t.prefKey] === false) return false;
+    if (t.adminOnly && !isAdmin(user)) return false;
     return true;
   });
 
@@ -60,7 +64,7 @@ export default function BottomNav({ activeTab, onTabChange }) {
   }, []);
 
   return (
-    <nav className={`app-nav ${visible ? 'app-nav--visible' : 'app-nav--hidden'}`}>
+    <nav className={`app-nav ${visible ? 'app-nav--visible' : 'app-nav--hidden'} app-nav--${handedness}`}>
       {TABS.map(({ id, label, icon: Icon, isFab }) => {
         const active = activeTab === id;
         return (

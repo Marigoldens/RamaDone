@@ -6,9 +6,11 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useMessages, useChatSessions } from '../../hooks/useMessages';
 import { useEvents, useAllEvents } from '../../hooks/useEvents';
 import { usePreferences } from '../../hooks/usePreferences';
+import { useGlobalApp } from '../../context/GlobalAppContext';
 import { chatWithAI, executeCalendarAction, executeQueryTool, sendFunctionResultsToAI, executeProductivityQuery } from '../../services/aiService';
 import { QUERY_TOOLS } from '../../services/aiTools';
 import { fetchPrayerTimes, parsePrayerTime } from '../../services/prayerService';
+import { trackAiUsageSecure, checkApiAccess } from '../../config/admin';
 import db from '../../db/dexie';
 
 import ChatSidebar from './ChatSidebar';
@@ -29,6 +31,7 @@ export default function ChatView({ user, accessToken }) {
 
   const { sessions, createSession, updateSessionMode } = useChatSessions();
   const { messages, sendMessage, updateMessageData } = useMessages(activeSessionId);
+  const { refreshAll } = useGlobalApp();
 
   const todayDate = format(new Date(), 'yyyy-MM-dd');
   const eventsHook = useEvents(todayDate);
@@ -107,25 +110,45 @@ export default function ChatView({ user, accessToken }) {
     try {
       for (const action of pendingActions) {
         if (action.tool === 'add_task') {
-          await db.tasks.add({ ...action.args, status: action.args.status || 'todo', createdAt: Date.now(), updatedAt: Date.now() });
+          const { title, priority, dueDate, category, notes } = action.args;
+          await db.tasks.add({ title, priority: priority || 'medium', dueDate, category, notes, status: action.args.status || 'todo', createdAt: Date.now(), updatedAt: Date.now() });
         } else if (action.tool === 'update_task') {
-          await db.tasks.update(action.args.id, { ...action.args.updates, updatedAt: Date.now() });
+          const cleanUpdates = { ...action.args.updates, updatedAt: Date.now() };
+          if (cleanUpdates.category) cleanUpdates.category = cleanUpdates.category.toLowerCase();
+          await db.tasks.update(action.args.id, cleanUpdates);
         } else if (action.tool === 'delete_task') {
           await db.tasks.delete(action.args.id);
         } else if (action.tool === 'add_expense') {
-          await db.expenses.add({ ...action.args, amount: parseFloat(action.args.amount), date: action.args.date || todayDate, createdAt: Date.now() });
+          // Create a completely clean object via JSON round-trip
+          const tempRecord = {
+            amount: parseFloat(action.args.amount) || 0,
+            type: String(action.args.type || 'expense'),
+            category: String(action.args.category || 'other').toLowerCase(),
+            date: String(action.args.date || todayDate),
+            note: action.args.note ? String(action.args.note) : null,
+            createdAt: Date.now()
+          };
+          // JSON round-trip ensures no hidden properties or functions
+          const cleanRecord = JSON.parse(JSON.stringify(tempRecord));
+          console.log('[add_expense] Saving:', JSON.stringify(cleanRecord));
+          await db.expenses.add(cleanRecord);
         } else if (action.tool === 'delete_expense') {
           await db.expenses.delete(action.args.id);
         } else if (action.tool === 'update_expense') {
-          const upd = { ...action.args.updates };
-          if (upd.amount) upd.amount = parseFloat(upd.amount);
-          await db.expenses.update(action.args.id, upd);
+          const cleanUpdates = { ...action.args.updates };
+          if (cleanUpdates.amount) cleanUpdates.amount = parseFloat(cleanUpdates.amount);
+          if (cleanUpdates.category) cleanUpdates.category = cleanUpdates.category.toLowerCase();
+          await db.expenses.update(action.args.id, cleanUpdates);
         } else if (action.tool === 'add_habit') {
-          await db.habits.add({ name: action.args.name, emoji: action.args.emoji || '🎯', category: action.args.category || null, frequency: action.args.frequency || 'daily', archived: 0, createdAt: new Date().toISOString() });
+          const { name, emoji, frequency } = action.args;
+          const category = action.args.category ? action.args.category.toLowerCase() : null;
+          await db.habits.add({ name, emoji: emoji || '🎯', category, frequency: frequency || 'daily', archived: 0, createdAt: new Date().toISOString() });
         } else if (action.tool === 'delete_habit') {
           await db.habits.update(action.args.habitId, { archived: 1 });
         } else if (action.tool === 'update_habit') {
-          await db.habits.update(action.args.habitId, action.args.updates);
+          const cleanUpdates = { ...action.args.updates };
+          if (cleanUpdates.category) cleanUpdates.category = cleanUpdates.category.toLowerCase();
+          await db.habits.update(action.args.habitId, cleanUpdates);
         } else if (action.tool === 'log_habit') {
           const existing = await db.habitLogs.where({ habitId: action.args.habitId, date: action.args.date }).first();
           if (existing) {
@@ -134,29 +157,81 @@ export default function ChatView({ user, accessToken }) {
             await db.habitLogs.add({ habitId: action.args.habitId, date: action.args.date, completed: action.args.completed, count: 1, note: '' });
           }
         } else if (action.tool === 'add_workout_plan') {
+          const { name, type } = action.args;
           const exercises = (action.args.exercises || []).map(e => ({
             name: e.name, sets: e.sets || 3, reps: e.reps || 10, targetWeight: e.targetWeight || 0,
           }));
-          await db.workoutPlans.add({ name: action.args.name, type: action.args.type || 'Custom', exercises, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+          await db.workoutPlans.add({ name, type: type || 'Custom', exercises, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
         } else if (action.tool === 'update_workout_plan') {
-          const upd = { ...action.args.updates, updatedAt: new Date().toISOString() };
-          await db.workoutPlans.update(action.args.id, upd);
+          const cleanUpdates = { ...action.args.updates, updatedAt: new Date().toISOString() };
+          await db.workoutPlans.update(action.args.id, cleanUpdates);
         } else if (action.tool === 'delete_workout_plan') {
           await db.workoutPlans.delete(action.args.id);
         } else if (action.tool === 'add_workout_log') {
+          const { planId, planName, notes } = action.args;
           await db.workoutLogs.add({
             date: action.args.date || new Date().toISOString(),
-            planId: action.args.planId || null,
-            planName: action.args.planName,
+            planId: planId || null,
+            planName,
             exercises: action.args.exercises || [],
-            notes: action.args.notes || '',
+            notes: notes || '',
             createdAt: new Date().toISOString(),
           });
         } else if (action.tool === 'delete_workout_log') {
           await db.workoutLogs.delete(action.args.id);
+        } else if (action.tool === 'generate_monthly_report') {
+          // Generate monthly expense report and save to database
+          const month = action.args.month;
+          const monthStart = month + '-01';
+          const monthEnd = month + '-31';
+          
+          // Get all expenses for the month
+          const monthExpenses = expenses.filter(e => e.date >= monthStart && e.date <= monthEnd);
+          
+          // Calculate totals by category
+          const categoryTotals = {};
+          let totalExpenses = 0;
+          let totalIncome = 0;
+          
+          monthExpenses.forEach(e => {
+            const cat = (e.category || 'other').toLowerCase();
+            if (e.type === 'expense') {
+              categoryTotals[cat] = (categoryTotals[cat] || 0) + (e.amount || 0);
+              totalExpenses += e.amount || 0;
+            } else {
+              totalIncome += e.amount || 0;
+            }
+          });
+          
+          // Build report content
+          const report = {
+            month,
+            title: action.args.title || `Monthly Report - ${month}`,
+            summary: {
+              totalExpenses,
+              totalIncome,
+              netSavings: totalIncome - totalExpenses,
+              transactionCount: monthExpenses.length,
+            },
+            categoryBreakdown: Object.entries(categoryTotals)
+              .map(([category, amount]) => ({ category, amount, percentage: totalExpenses > 0 ? Math.round((amount / totalExpenses) * 100) : 0 }))
+              .sort((a, b) => b.amount - a.amount),
+            topSpendingCategories: Object.entries(categoryTotals)
+              .sort((a, b) => b[1] - a[1])
+              .slice(0, 3)
+              .map(([cat, amt]) => ({ category: cat, amount: amt })),
+            insights: [], // AI will fill this in the conversation
+            recommendations: [], // AI will fill this in the conversation
+            createdAt: Date.now(),
+          };
+          
+          await db.monthlyReports.add(report);
+          console.log('[generate_monthly_report] Saved report for', month);
         }
       }
       await updateMessageData(messageId, { isConfirmed: true });
+      // Refresh global cache so Dashboard and other views update immediately
+      refreshAll?.();
     } catch (err) {
       console.error('Failed to confirm productivity actions', err);
     }
@@ -172,6 +247,22 @@ export default function ChatView({ user, accessToken }) {
     inputRef.current?.focus();
 
     try {
+      // Check API access before making AI request
+      let hasAccess = false;
+      try {
+        const result = await checkApiAccess();
+        hasAccess = result.hasAccess;
+      } catch (err) {
+        console.warn('[Chat] Could not verify API access, proceeding anyway');
+        hasAccess = true; // Fallback for offline/dev
+      }
+
+      if (!hasAccess) {
+        await sendMessage('assistant', '⚠️ You do not have API access yet. Please contact the admin to grant you access to use AI features.', {}, activeSessionId || 'default');
+        setLoading(false);
+        return;
+      }
+
       let currentSessionId = activeSessionId;
       if (!currentSessionId) {
         // chatMode is the mode bar selection before any session exists
@@ -222,22 +313,44 @@ export default function ChatView({ user, accessToken }) {
         const mkProductivity = (call) => {
           const t = tasks?.find(x => x.id === call.args.id);
           const h = habits?.find(x => x.id === call.args.habitId);
+          // Sanitize args to remove any non-serializable values
+          const sanitize = (obj) => {
+            if (!obj || typeof obj !== 'object') return obj;
+            if (Array.isArray(obj)) {
+              return obj.map(item => {
+                if (typeof item === 'function') return undefined;
+                if (item && typeof item === 'object') return sanitize(item);
+                return item;
+              }).filter(item => item !== undefined);
+            }
+            const clean = {};
+            for (const [k, v] of Object.entries(obj)) {
+              if (typeof v === 'function') continue;
+              if (v && typeof v === 'object') {
+                clean[k] = sanitize(v);
+              } else {
+                clean[k] = v;
+              }
+            }
+            return clean;
+          };
+          const cleanArgs = sanitize(call.args);
           switch (call.name) {
-            case 'add_task': return { tool: call.name, args: call.args, display: `Add task: "${call.args.title}"`, sub: `Priority: ${call.args.priority || 'medium'}${call.args.dueDate ? ` · Due ${call.args.dueDate}` : ''}` };
-            case 'update_task': return { tool: call.name, args: call.args, display: `Update task: "${t?.title || `#${call.args.id}`}"`, sub: JSON.stringify(call.args.updates) };
-            case 'delete_task': return { tool: call.name, args: call.args, display: `Delete task: "${t?.title || `#${call.args.id}`}"`, sub: 'Cannot be undone', danger: true };
-            case 'add_expense': return { tool: call.name, args: call.args, display: `Log ${call.args.type}: ${call.args.amount} · ${call.args.category}`, sub: call.args.note || call.args.date || todayDate };
-            case 'update_expense': return { tool: call.name, args: call.args, display: `Edit expense #${call.args.id}`, sub: Object.entries(call.args.updates || {}).map(([k, v]) => `${k}: ${v}`).join(', ') };
-            case 'delete_expense': return { tool: call.name, args: call.args, display: `Delete entry #${call.args.id}`, sub: 'Expense entry', danger: true };
-            case 'add_habit': return { tool: call.name, args: call.args, display: `Add habit: "${call.args.name}"`, sub: `${call.args.emoji || '🎯'} · ${call.args.frequency || 'daily'}${call.args.category ? ` · ${call.args.category}` : ''}` };
-            case 'update_habit': return { tool: call.name, args: call.args, display: `Edit habit: "${h?.name || `Habit #${call.args.habitId}`}"`, sub: Object.entries(call.args.updates || {}).map(([k, v]) => `${k}: ${v}`).join(', ') };
-            case 'delete_habit': return { tool: call.name, args: call.args, display: `Archive habit: "${h?.name || `Habit #${call.args.habitId}`}"`, sub: 'Habit will be hidden', danger: true };
-            case 'log_habit': return { tool: call.name, args: call.args, display: `${call.args.completed ? '✅ Mark done' : '↩️ Undo'}: "${h?.name || `Habit #${call.args.habitId}`}"`, sub: `Date: ${call.args.date}` };
-            case 'add_workout_plan': return { tool: call.name, args: call.args, display: `Create plan: "${call.args.name}"`, sub: `${call.args.type} · ${(call.args.exercises || []).length} exercises` };
-            case 'update_workout_plan': return { tool: call.name, args: call.args, display: `Update plan #${call.args.id}`, sub: Object.entries(call.args.updates || {}).map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join(', ') };
-            case 'delete_workout_plan': return { tool: call.name, args: call.args, display: `Delete plan: "${call.args.planName || `#${call.args.id}`}"`, sub: 'Cannot be undone', danger: true };
-            case 'add_workout_log': return { tool: call.name, args: call.args, display: `Log workout: "${call.args.planName}"`, sub: `${(call.args.exercises || []).length} exercises` };
-            case 'delete_workout_log': return { tool: call.name, args: call.args, display: `Delete workout log #${call.args.id}`, sub: 'Cannot be undone', danger: true };
+            case 'add_task': return { tool: call.name, args: cleanArgs, display: `Add task: "${cleanArgs.title}"`, sub: `Priority: ${cleanArgs.priority || 'medium'}${cleanArgs.dueDate ? ` · Due ${cleanArgs.dueDate}` : ''}` };
+            case 'update_task': return { tool: call.name, args: cleanArgs, display: `Update task: "${t?.title || `#${cleanArgs.id}`}"`, sub: JSON.stringify(cleanArgs.updates) };
+            case 'delete_task': return { tool: call.name, args: cleanArgs, display: `Delete task: "${t?.title || `#${cleanArgs.id}`}"`, sub: 'Cannot be undone', danger: true };
+            case 'add_expense': return { tool: call.name, args: cleanArgs, display: `Log ${cleanArgs.type}: ${cleanArgs.amount} · ${cleanArgs.category}`, sub: cleanArgs.note || cleanArgs.date || todayDate };
+            case 'update_expense': return { tool: call.name, args: cleanArgs, display: `Edit expense #${cleanArgs.id}`, sub: Object.entries(cleanArgs.updates || {}).map(([k, v]) => `${k}: ${v}`).join(', ') };
+            case 'delete_expense': return { tool: call.name, args: cleanArgs, display: `Delete entry #${cleanArgs.id}`, sub: 'Expense entry', danger: true };
+            case 'add_habit': return { tool: call.name, args: cleanArgs, display: `Add habit: "${cleanArgs.name}"`, sub: `${cleanArgs.emoji || '🎯'} · ${cleanArgs.frequency || 'daily'}${cleanArgs.category ? ` · ${cleanArgs.category}` : ''}` };
+            case 'update_habit': return { tool: call.name, args: cleanArgs, display: `Edit habit: "${h?.name || `Habit #${cleanArgs.habitId}`}"`, sub: Object.entries(cleanArgs.updates || {}).map(([k, v]) => `${k}: ${v}`).join(', ') };
+            case 'delete_habit': return { tool: call.name, args: cleanArgs, display: `Archive habit: "${h?.name || `Habit #${cleanArgs.habitId}`}"`, sub: 'Habit will be hidden', danger: true };
+            case 'log_habit': return { tool: call.name, args: cleanArgs, display: `${cleanArgs.completed ? '✅ Mark done' : '↩️ Undo'}: "${h?.name || `Habit #${cleanArgs.habitId}`}"`, sub: `Date: ${cleanArgs.date}` };
+            case 'add_workout_plan': return { tool: call.name, args: cleanArgs, display: `Create plan: "${cleanArgs.name}"`, sub: `${cleanArgs.type} · ${(cleanArgs.exercises || []).length} exercises` };
+            case 'update_workout_plan': return { tool: call.name, args: cleanArgs, display: `Update plan #${cleanArgs.id}`, sub: Object.entries(cleanArgs.updates || {}).map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join(', ') };
+            case 'delete_workout_plan': return { tool: call.name, args: cleanArgs, display: `Delete plan: "${cleanArgs.planName || `#${cleanArgs.id}`}"`, sub: 'Cannot be undone', danger: true };
+            case 'add_workout_log': return { tool: call.name, args: cleanArgs, display: `Log workout: "${cleanArgs.planName}"`, sub: `${(cleanArgs.exercises || []).length} exercises` };
+            case 'delete_workout_log': return { tool: call.name, args: cleanArgs, display: `Delete workout log #${cleanArgs.id}`, sub: 'Cannot be undone', danger: true };
             default: return null;
           }
         };
@@ -345,6 +458,13 @@ export default function ChatView({ user, accessToken }) {
 
       if (aiResponse.text) {
         await sendMessage('assistant', aiResponse.text, {}, currentSessionId);
+        // Track AI usage via Cloud Function (secure, server-side)
+        if (user?.uid) {
+          const approxTokens = Math.ceil((textToSubmit.length + aiResponse.text.length) / 4);
+          trackAiUsageSecure(approxTokens).catch(err => {
+            console.warn('[Chat] Failed to track AI usage:', err);
+          });
+        }
       }
     } catch (err) {
       console.error('Chat Error:', err);

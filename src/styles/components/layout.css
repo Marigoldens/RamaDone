@@ -31,6 +31,55 @@
   min-width: 0;
 }
 
+/* ═══════════════════════════════════════════
+   PAGE TRANSITION ANIMATIONS
+   ═══════════════════════════════════════════ */
+
+/* Page wrapper for transitions */
+.page-view {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Page entrance - slide in from right */
+.page-enter {
+  animation: pageSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes pageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Page exit - fade out quickly */
+.page-exit {
+  animation: pageFadeOut 0.15s ease forwards;
+}
+
+@keyframes pageFadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Instant page switch (no animation for cached pages) */
+.page-instant {
+  animation: none;
+  opacity: 1;
+  transform: none;
+}
+
 /* ---- Side/Bottom Navigation ---- */
 .app-nav {
   z-index: 50;
@@ -169,6 +218,13 @@
   max-width: 100%;
 }
 
+/* Hide labels on mobile for cleaner look */
+@media (max-width: 767px) {
+  .nav-tab__label {
+    display: none;
+  }
+}
+
 /* ---- Central Tab Button (Home) ---- */
 .nav-tab--fab {
   z-index: 10;
@@ -191,6 +247,17 @@
 
 .nav-tab--fab.nav-tab--inactive:hover {
   background-color: transparent;
+}
+
+/* ---- Handedness positioning (mobile) ---- */
+/* Right-handed: Home FAB on the right side */
+.app-nav--right .nav-tab--fab {
+  order: 2; /* Push to the right */
+}
+
+/* Left-handed: Home FAB on the left side */
+.app-nav--left .nav-tab--fab {
+  order: 0; /* Keep on the left */
 }
 
 @media (min-width: 768px) {

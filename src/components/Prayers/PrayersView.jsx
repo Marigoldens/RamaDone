@@ -1,38 +1,28 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
 import { MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
-import db from '../../db/dexie';
+import { useGlobalApp } from '../../context/GlobalAppContext';
 import { usePreferences } from '../../hooks/usePreferences';
-import { usePrayerSync } from '../../hooks/usePrayerSync';
 
+/**
+ * Prayers view - instant rendering with globally cached prayer times.
+ * No per-view API calls - data is pre-synced in GlobalAppContext.
+ */
 export default function PrayersView() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const { prefs } = usePreferences();
+  const { prayerTimes, syncPrayerMonth } = useGlobalApp();
   const tableContainerRef = useRef(null);
-
-  // Trigger prayer sync for the selected month
-  const monthStartStr = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
-  const { loading } = usePrayerSync(monthStartStr);
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
 
-  // Query the dedicated prayerTimes table (NOT the events table)
-  const prayerRows = useLiveQuery(
-    () => db.prayerTimes
-      .where('date')
-      .between(format(monthStart, 'yyyy-MM-dd'), format(monthEnd, 'yyyy-MM-dd'), true, true)
-      .toArray(),
-    [currentMonth]
-  );
-
   // Build a Map for fast lookup: date → prayer times object
   const prayerMap = useMemo(() => {
     const map = new Map();
-    (prayerRows || []).forEach(r => map.set(r.date, r));
+    prayerTimes.forEach(r => map.set(r.date, r));
     return map;
-  }, [prayerRows]);
+  }, [prayerTimes]);
 
   const days = useMemo(() => {
     const interval = eachDayOfInterval({ start: monthStart, end: monthEnd });
@@ -51,19 +41,45 @@ export default function PrayersView() {
       };
     });
   }, [prayerMap, monthStart, monthEnd]);
-
+  
+  // Sync new month when navigating (only if not cached)
   useEffect(() => {
-    // Scroll to today's row if it exists
-    const timer = setTimeout(() => {
+    const lat = prefs.latitude;
+    const lon = prefs.longitude;
+    const method = prefs.calcMethod ?? 2;
+    
+    if (lat && lon && prefs.prayerMode) {
+      const monthStr = format(currentMonth, 'yyyy-MM');
+      const monthStartStr = format(monthStart, 'yyyy-MM-dd');
+      const monthEndStr = format(monthEnd, 'yyyy-MM-dd');
+      
+      // Check if we have data for this month
+      const hasData = prayerTimes.some(p => p.date >= monthStartStr && p.date <= monthEndStr);
+      
+      if (!hasData) {
+        // Trigger background sync for new month
+        syncPrayerMonth?.(monthStart, lat, lon, method);
+      }
+    }
+  }, [currentMonth, prefs.latitude, prefs.longitude, prefs.calcMethod, prefs.prayerMode]);
+
+  // Scroll to today's row instantly on first mount (no animation)
+  const hasScrolledRef = useRef(false);
+  useEffect(() => {
+    if (hasScrolledRef.current) return;
+    hasScrolledRef.current = true;
+    
+    // Use requestAnimationFrame for instant scroll before paint
+    requestAnimationFrame(() => {
       if (tableContainerRef.current) {
         const todayRow = tableContainerRef.current.querySelector('.row-today');
         if (todayRow) {
-          todayRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Instant scroll - no animation, just position
+          tableContainerRef.current.scrollTop = todayRow.offsetTop - tableContainerRef.current.offsetHeight / 2;
         }
       }
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [currentMonth, days]);
+    });
+  }, []); // Only run once on mount
 
   /**
    * Format a prayer time string (e.g. "04:32") for display.
@@ -111,8 +127,6 @@ export default function PrayersView() {
           </button>
         </div>
       </header>
-
-      {loading && <div className="prayers-loading-bar" />}
 
       <div className="prayers-table-container" ref={tableContainerRef}>
         <table className="prayers-table">

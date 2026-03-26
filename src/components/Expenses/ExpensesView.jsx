@@ -1,17 +1,24 @@
 import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { format, endOfMonth, addMonths, subMonths, startOfYear, endOfYear, eachMonthOfInterval } from 'date-fns';
+import { format, endOfMonth, addMonths, subMonths, startOfYear, endOfYear, eachMonthOfInterval, eachDayOfInterval, startOfMonth, isToday, isYesterday, isSameDay, subDays } from 'date-fns';
 import {
   Plus, TrendingUp, TrendingDown, Wallet, X, ArrowUpCircle, ArrowDownCircle,
   ShoppingCart, Utensils, Car, Home, Heart, Gamepad2, Smartphone, BookOpen,
   MoreHorizontal, PiggyBank, Briefcase, Gift, DollarSign, Target,
-  ChevronLeft, ChevronRight, BarChart3, FileText, Sparkles,
+  ChevronLeft, ChevronRight, BarChart3, FileText, Sparkles, Calendar, Zap, AlertCircle,
 } from 'lucide-react';
 import db from '../../db/dexie';
 
 /** Format number as IQD — no decimals, comma-separated */
 function fmtIQD(n) {
   return Math.round(n).toLocaleString('en-US') + ' IQD';
+}
+
+/** Format compact number for stats */
+function fmtCompact(n) {
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+  if (n >= 1000) return (n / 1000).toFixed(0) + 'K';
+  return n.toString();
 }
 
 const EXPENSE_CATEGORIES = [
@@ -34,13 +41,163 @@ const INCOME_SOURCES = [
 ];
 
 /**
- * Expenses View — IQD currency, month/year views, balance overview.
- * All data stored in Dexie — fully offline.
+ * Expenses View — Redesigned with Financial Editorial aesthetic.
+ * Data-forward, typographic hierarchy, insight-rich sections.
  */
 export default function ExpensesView({ onNavigate }) {
   const [showModal, setShowModal]       = useState(null); // 'expense' | 'income' | null
   const [filterMonth, setFilterMonth]   = useState(format(new Date(), 'yyyy-MM'));
   const [viewTab, setViewTab]           = useState('month'); // 'month' | 'year'
+  const [selectedReport, setSelectedReport] = useState(null); // For report detail modal
+  const [selectedYearMonth, setSelectedYearMonth] = useState(null); // For yearly drill-down
+  const [generatingReport, setGeneratingReport] = useState(false); // Loading state for report generation
+
+  // Generate monthly report with AI analysis
+  async function generateMonthlyReport() {
+    if (generatingReport) return;
+    setGeneratingReport(true);
+    try {
+      // Calculate totals by category
+      const categoryTotals = {};
+      let totalExpenses = 0;
+      let totalIncome = 0;
+      
+      transactions.forEach(e => {
+        const cat = (e.category || 'other').toLowerCase();
+        if (e.type === 'expense') {
+          categoryTotals[cat] = (categoryTotals[cat] || 0) + (e.amount || 0);
+          totalExpenses += e.amount || 0;
+        } else {
+          totalIncome += e.amount || 0;
+        }
+      });
+      
+      // Build data for AI prompt
+      const categoryBreakdown = Object.entries(categoryTotals)
+        .map(([category, amount]) => ({ 
+          category, 
+          amount, 
+          percentage: totalExpenses > 0 ? Math.round((amount / totalExpenses) * 100) : 0 
+        }))
+        .sort((a, b) => b.amount - a.amount);
+      
+      // Call DeepSeek API for AI insights
+      const DEEPSEEK_API_KEY = import.meta.env.VITE_DEEPSEEK_API_KEY;
+      let aiInsights = [];
+      let aiRecommendations = [];
+      let aiSummary = '';
+      
+      if (DEEPSEEK_API_KEY) {
+        try {
+          const prompt = `You are a financial advisor. Analyze this monthly expense data and provide insights.
+
+Month: ${monthLabel}
+Total Income: ${fmtIQD(totalIncome)}
+Total Expenses: ${fmtIQD(totalExpenses)}
+Net Savings: ${fmtIQD(totalIncome - totalExpenses)} (${savingsRate}% savings rate)
+Daily Average Spending: ${fmtIQD(dailyAverage)}
+Transactions: ${transactions.length}
+
+Category Breakdown:
+${categoryBreakdown.map(c => `- ${c.category}: ${fmtIQD(c.amount)} (${c.percentage}%)`).join('\n')}
+
+Top Spending: ${topCategoryInfo ? `${topCategoryInfo.label} at ${Math.round((topCategory[1] / totalExpense) * 100)}%` : 'N/A'}
+
+Provide:
+1. A brief 2-3 sentence summary of the month's financial health
+2. 3 specific insights about spending patterns (each as a bullet point)
+3. 2-3 actionable recommendations to improve finances (each as a bullet point)
+
+Format your response as JSON:
+{
+  "summary": "your summary text",
+  "insights": ["insight 1", "insight 2", "insight 3"],
+  "recommendations": ["rec 1", "rec 2", "rec 3"]
+}`;
+
+          const res = await fetch('https://api.deepseek.com/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
+            },
+            body: JSON.stringify({
+              model: 'deepseek-chat',
+              messages: [{ role: 'user', content: prompt }],
+              max_tokens: 1024,
+            }),
+          });
+          
+          if (res.ok) {
+            const data = await res.json();
+            const content = data.choices?.[0]?.message?.content || '';
+            // Try to parse JSON from response
+            const jsonMatch = content.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              const parsed = JSON.parse(jsonMatch[0]);
+              aiSummary = parsed.summary || '';
+              aiInsights = parsed.insights || [];
+              aiRecommendations = parsed.recommendations || [];
+            }
+          }
+        } catch (aiErr) {
+          console.warn('AI analysis failed, using fallback', aiErr);
+        }
+      }
+      
+      // Fallback insights if AI didn't work
+      if (aiInsights.length === 0) {
+        aiInsights = [
+          totalExpenses > totalIncome 
+            ? `You spent ${fmtIQD(totalExpenses - totalIncome)} more than you earned this month.`
+            : `Great job! You saved ${fmtIQD(totalIncome - totalExpenses)} this month (${savingsRate}% savings rate).`,
+          `Your daily average spending was ${fmtIQD(dailyAverage)}.`,
+          topCategoryInfo 
+            ? `${topCategoryInfo.label} was your top spending category at ${Math.round((topCategory[1] / totalExpense) * 100)}% of total expenses.`
+            : 'Your spending is distributed across multiple categories.',
+        ];
+      }
+      
+      if (aiRecommendations.length === 0) {
+        aiRecommendations = [
+          savingsRate < 20 && savingsRate >= 0 ? 'Try to increase your savings rate to at least 20%.' : 'Keep maintaining your good savings habits!',
+          totalExpenses > totalIncome ? 'Consider reviewing your discretionary spending to balance your budget.' : 'Continue tracking your expenses to maintain financial awareness.',
+        ].filter(Boolean);
+      }
+      
+      // Build report
+      const report = {
+        month: filterMonth,
+        title: `AI Report - ${monthLabel}`,
+        summary: {
+          totalExpenses,
+          totalIncome,
+          netSavings: totalIncome - totalExpenses,
+          transactionCount: transactions.length,
+          aiSummary,
+        },
+        categoryBreakdown,
+        topSpendingCategories: categoryBreakdown.slice(0, 3).map(c => ({ category: c.category, amount: c.amount })),
+        insights: aiInsights,
+        recommendations: aiRecommendations,
+        createdAt: Date.now(),
+      };
+      
+      // Check if report exists for this month and update instead of creating duplicate
+      const existingReport = monthlyReports.find(r => r.month === filterMonth);
+      if (existingReport) {
+        await db.monthlyReports.update(existingReport.id, report);
+        console.log('[generateMonthlyReport] Updated existing report for', filterMonth);
+      } else {
+        await db.monthlyReports.add(report);
+        console.log('[generateMonthlyReport] Created new report for', filterMonth);
+      }
+    } catch (err) {
+      console.error('Failed to generate report', err);
+    } finally {
+      setGeneratingReport(false);
+    }
+  }
 
   const monthDate  = new Date(filterMonth + '-01');
   const monthStart = filterMonth + '-01';
@@ -54,21 +211,55 @@ export default function ExpensesView({ onNavigate }) {
     setFilterMonth(format(addMonths(monthDate, 1), 'yyyy-MM'));
   }
 
-  const transactions = useLiveQuery(
-    () => db.expenses.where('date').between(monthStart, monthEnd, true, true).reverse().toArray(),
-    [monthStart, monthEnd]
+  // Use live query for real-time expense data
+  const expenses = useLiveQuery(
+    () => db.expenses.toArray(),
+    []
   ) ?? [];
+  
+  // Filter from live data
+  const transactions = useMemo(() => {
+    return expenses
+      .filter(e => e.date >= monthStart && e.date <= monthEnd)
+      .sort((a, b) => {
+        const dateCmp = b.date.localeCompare(a.date);
+        if (dateCmp !== 0) return dateCmp;
+        // Handle createdAt which could be Date, string, number, or undefined
+        const toStr = (v) => {
+          if (!v) return '';
+          if (typeof v === 'string') return v;
+          if (v instanceof Date) return v.toISOString();
+          if (typeof v === 'number') return new Date(v).toISOString();
+          return String(v);
+        };
+        return toStr(b.createdAt).localeCompare(toStr(a.createdAt));
+      });
+  }, [expenses, monthStart, monthEnd]);
 
   const budgets = useLiveQuery(
     () => db.budgets.where('month').equals(filterMonth).toArray(),
     [filterMonth]
   ) ?? [];
 
-  // Aggregations
+  // Monthly reports for this month
+  const monthlyReports = useLiveQuery(
+    () => db.monthlyReports.where('month').equals(filterMonth).toArray(),
+    [filterMonth]
+  ) ?? [];
+
+  // ─── Core Aggregations ───
   const totalExpense = transactions.filter(e => e.type === 'expense').reduce((s, e) => s + e.amount, 0);
   const totalIncome  = transactions.filter(e => e.type === 'income').reduce((s, e) => s + e.amount, 0);
   const balance      = totalIncome - totalExpense;
-
+  
+  // ─── Derived Insights ───
+  const daysInMonth = eachDayOfInterval({ start: new Date(monthStart), end: new Date(monthEnd) }).length;
+  const daysPassed = eachDayOfInterval({ start: new Date(monthStart), end: new Date() }).length;
+  const dailyAverage = daysPassed > 0 ? Math.round(totalExpense / daysPassed) : 0;
+  const savingsRate = totalIncome > 0 ? Math.round((balance / totalIncome) * 100) : 0;
+  const transactionCount = transactions.length;
+  
+  // Top spending category
   const byCategory = useMemo(() => {
     const map = {};
     transactions.filter(e => e.type === 'expense').forEach(e => {
@@ -76,9 +267,38 @@ export default function ExpensesView({ onNavigate }) {
     });
     return map;
   }, [transactions]);
+  
+  const topCategory = Object.entries(byCategory).sort((a, b) => b[1] - a[1])[0];
+  const topCategoryInfo = topCategory ? EXPENSE_CATEGORIES.find(c => c.id === topCategory[0]) : null;
+  
+  // Highest spending day
+  const spendingByDay = useMemo(() => {
+    const map = {};
+    transactions.filter(e => e.type === 'expense').forEach(e => {
+      map[e.date] = (map[e.date] || 0) + e.amount;
+    });
+    return map;
+  }, [transactions]);
+  
+  const highestSpendingDay = Object.entries(spendingByDay).sort((a, b) => b[1] - a[1])[0];
+  
+  // ─── Group transactions by date ───
+  const transactionsByDate = useMemo(() => {
+    const groups = {};
+    transactions.forEach(t => {
+      if (!groups[t.date]) groups[t.date] = [];
+      groups[t.date].push(t);
+    });
+    return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]));
+  }, [transactions]);
 
   async function addTransaction(data) {
-    await db.expenses.add({ ...data, createdAt: new Date().toISOString() });
+    const sanitizedData = {
+      ...data,
+      category: (data.category || 'other').toLowerCase(),
+      createdAt: new Date().toISOString()
+    };
+    await db.expenses.add(sanitizedData);
     setShowModal(null);
   }
 
@@ -86,190 +306,422 @@ export default function ExpensesView({ onNavigate }) {
     await db.expenses.delete(id);
   }
 
+  async function deleteReport(id) {
+    await db.monthlyReports.delete(id);
+  }
+
+  // ─── Insight Cards Data ───
+  const insights = useMemo(() => {
+    const cards = [];
+    
+    if (savingsRate < 0) {
+      cards.push({
+        type: 'warning',
+        icon: AlertCircle,
+        title: 'Overspending',
+        message: `You've spent ${fmtIQD(Math.abs(balance))} more than your income this month.`,
+        color: '#ef4444'
+      });
+    } else if (savingsRate > 30) {
+      cards.push({
+        type: 'success',
+        icon: TrendingUp,
+        title: 'Great Savings',
+        message: `${savingsRate}% savings rate — you're building wealth!`,
+        color: '#10b981'
+      });
+    }
+    
+    if (topCategoryInfo && topCategory[1] > totalExpense * 0.4) {
+      cards.push({
+        type: 'info',
+        icon: topCategoryInfo.icon,
+        title: `${topCategoryInfo.label} Dominant`,
+        message: `${Math.round((topCategory[1] / totalExpense) * 100)}% of spending in one category.`,
+        color: topCategoryInfo.color
+      });
+    }
+    
+    if (dailyAverage > 0) {
+      const projected = dailyAverage * daysInMonth;
+      if (projected > totalIncome * 0.9 && totalIncome > 0) {
+        cards.push({
+          type: 'warning',
+          icon: Calendar,
+          title: 'Budget Alert',
+          message: `At this pace, you'll spend ${fmtIQD(projected)} by month end.`,
+          color: '#f97316'
+        });
+      }
+    }
+    
+    return cards.slice(0, 2); // Max 2 insights
+  }, [savingsRate, balance, topCategory, topCategoryInfo, totalExpense, dailyAverage, daysInMonth, totalIncome]);
+
   return (
     <div className="expenses-view">
-      {/* ═══ Header ═══ */}
-      <header className="expenses-header">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-text tracking-tight">Expenses</h1>
-          <div className="expenses-header__actions">
-            <button onClick={() => setShowModal('income')}
-              className="expenses-add-btn expenses-add-btn--income">
-              <ArrowUpCircle className="w-4 h-4" />
-              <span>Income</span>
-            </button>
-            <button onClick={() => setShowModal('expense')}
-              className="expenses-add-btn expenses-add-btn--expense">
-              <ArrowDownCircle className="w-4 h-4" />
-              <span>Expense</span>
-            </button>
+      {/* ═══ Hero Header ═══ */}
+      <header className="expenses-hero">
+        <div className="expenses-hero__top">
+          <div className="expenses-hero__title-row">
+            <h1 className="expenses-hero__title">Expenses</h1>
+            <div className="expenses-hero__actions">
+              <button onClick={() => setShowModal('income')}
+                className="expenses-action-btn expenses-action-btn--income">
+                <ArrowUpCircle className="w-4 h-4" />
+                <span>Income</span>
+              </button>
+              <button onClick={() => setShowModal('expense')}
+                className="expenses-action-btn expenses-action-btn--expense">
+                <ArrowDownCircle className="w-4 h-4" />
+                <span>Expense</span>
+              </button>
+            </div>
           </div>
-        </div>
-
-        {/* Month/Year toggle + Navigation */}
-        <div className="expenses-nav-row">
-          <div className="expenses-tab-toggle">
-            <button
-              className={`expenses-tab ${viewTab === 'month' ? 'expenses-tab--active' : ''}`}
-              onClick={() => setViewTab('month')}
-            >Month</button>
-            <button
-              className={`expenses-tab ${viewTab === 'year' ? 'expenses-tab--active' : ''}`}
-              onClick={() => setViewTab('year')}
-            >Year</button>
-          </div>
-          <div className="expenses-month-nav">
-            <button className="expenses-month-nav__arrow" onClick={prevMonth}>
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="expenses-month-nav__label">{monthLabel}</span>
-            <button className="expenses-month-nav__arrow" onClick={nextMonth}>
-              <ChevronRight className="w-4 h-4" />
-            </button>
+          
+          {/* Month Navigation */}
+          <div className="expenses-hero__nav">
+            <div className="expenses-tab-group">
+              <button
+                className={`expenses-tab ${viewTab === 'month' ? 'expenses-tab--active' : ''}`}
+                onClick={() => setViewTab('month')}
+              >Month</button>
+              <button
+                className={`expenses-tab ${viewTab === 'year' ? 'expenses-tab--active' : ''}`}
+                onClick={() => setViewTab('year')}
+              >Year</button>
+            </div>
+            <div className="expenses-month-nav">
+              <button className="expenses-month-arrow" onClick={prevMonth}>
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="expenses-month-label">{monthLabel}</span>
+              <button className="expenses-month-arrow" onClick={nextMonth}>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       </header>
 
       {viewTab === 'month' ? (
         <>
-          {/* ═══ Balance Card ═══ */}
-          <div className="expenses-balance-card">
-            <div className="expenses-balance-card__top">
-              <div className="flex items-center gap-2">
-                <Wallet className="w-5 h-5 text-accent" />
-                <span className="text-xs font-bold uppercase tracking-wider text-text-muted">Monthly Balance</span>
+          {/* ═══ Balance Hero Card ═══ */}
+          <div className="expenses-balance-hero">
+            <div className="balance-hero__main">
+              <div className="balance-hero__label">
+                <Wallet className="w-4 h-4" />
+                <span>Monthly Balance</span>
               </div>
-              <span className={`text-xl font-bold ${balance >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+              <div className={`balance-hero__amount ${balance >= 0 ? 'balance-hero__amount--positive' : 'balance-hero__amount--negative'}`}>
                 {balance >= 0 ? '+' : ''}{fmtIQD(balance)}
-              </span>
+              </div>
             </div>
-            <div className="expenses-balance-card__bar">
-              <div className="expenses-balance-card__income-bar"
-                style={{ width: totalIncome > 0 ? '100%' : '0' }} />
-              <div className="expenses-balance-card__expense-bar"
-                style={{ width: totalIncome > 0 ? `${Math.min(100, (totalExpense / totalIncome) * 100)}%` : '0' }} />
+            
+            <div className="balance-hero__flow">
+              <div className="balance-flow__item balance-flow__item--income">
+                <div className="balance-flow__icon">
+                  <ArrowUpCircle className="w-3.5 h-3.5" />
+                </div>
+                <div className="balance-flow__content">
+                  <span className="balance-flow__label">Income</span>
+                  <span className="balance-flow__value">{fmtIQD(totalIncome)}</span>
+                </div>
+              </div>
+              <div className="balance-flow__divider" />
+              <div className="balance-flow__item balance-flow__item--expense">
+                <div className="balance-flow__icon">
+                  <ArrowDownCircle className="w-3.5 h-3.5" />
+                </div>
+                <div className="balance-flow__content">
+                  <span className="balance-flow__label">Spent</span>
+                  <span className="balance-flow__value">{fmtIQD(totalExpense)}</span>
+                </div>
+              </div>
             </div>
-            <div className="expenses-balance-card__legend">
-              <span className="expenses-balance-card__legend-item">
-                <span className="expenses-balance-card__legend-dot expenses-balance-card__legend-dot--income" />
-                Income: {fmtIQD(totalIncome)}
-              </span>
-              <span className="expenses-balance-card__legend-item">
-                <span className="expenses-balance-card__legend-dot expenses-balance-card__legend-dot--expense" />
-                Spent: {fmtIQD(totalExpense)}
-              </span>
+            
+            {/* Progress bar showing spending ratio */}
+            <div className="balance-hero__progress">
+              <div className="balance-progress__track">
+                <div 
+                  className="balance-progress__fill"
+                  style={{ width: totalIncome > 0 ? `${Math.min(100, (totalExpense / totalIncome) * 100)}%` : '0%' }}
+                />
+              </div>
+              <div className="balance-progress__labels">
+                <span>{totalIncome > 0 ? Math.round((totalExpense / totalIncome) * 100) : 0}% of income spent</span>
+                <span>{savingsRate >= 0 ? `${savingsRate}% saved` : '0% saved'}</span>
+              </div>
             </div>
           </div>
 
-          {/* ═══ Summary Cards ═══ */}
-          <div className="expenses-summary">
-            <div className="expense-summary-card expense-summary-card--expense">
-              <ArrowDownCircle className="w-5 h-5 text-red-500" />
-              <div>
-                <p className="text-xs text-text-muted font-semibold">Expenses</p>
-                <p className="text-lg font-bold text-text">{fmtIQD(totalExpense)}</p>
+          {/* ═══ Quick Stats Grid ═══ */}
+          <div className="expenses-stats-grid">
+            <div className="expense-stat-card">
+              <div className="expense-stat-card__icon">
+                <Calendar className="w-4 h-4" />
+              </div>
+              <div className="expense-stat-card__content">
+                <span className="expense-stat-card__value">{fmtIQD(dailyAverage)}</span>
+                <span className="expense-stat-card__label">Daily Avg</span>
               </div>
             </div>
-            <div className="expense-summary-card expense-summary-card--income">
-              <ArrowUpCircle className="w-5 h-5 text-emerald-500" />
-              <div>
-                <p className="text-xs text-text-muted font-semibold">Income</p>
-                <p className="text-lg font-bold text-text">{fmtIQD(totalIncome)}</p>
+            <div className="expense-stat-card">
+              <div className="expense-stat-card__icon expense-stat-card__icon--accent">
+                <PiggyBank className="w-4 h-4" />
+              </div>
+              <div className="expense-stat-card__content">
+                <span className="expense-stat-card__value">{savingsRate}%</span>
+                <span className="expense-stat-card__label">Savings Rate</span>
+              </div>
+            </div>
+            <div className="expense-stat-card">
+              <div className="expense-stat-card__icon">
+                {topCategoryInfo ? (
+                  <topCategoryInfo.icon className="w-4 h-4" style={{ color: topCategoryInfo.color }} />
+                ) : (
+                  <Target className="w-4 h-4" />
+                )}
+              </div>
+              <div className="expense-stat-card__content">
+                <span className="expense-stat-card__value">{topCategoryInfo?.label || '—'}</span>
+                <span className="expense-stat-card__label">Top Category</span>
+              </div>
+            </div>
+            <div className="expense-stat-card">
+              <div className="expense-stat-card__icon">
+                <FileText className="w-4 h-4" />
+              </div>
+              <div className="expense-stat-card__content">
+                <span className="expense-stat-card__value">{transactionCount}</span>
+                <span className="expense-stat-card__label">Transactions</span>
               </div>
             </div>
           </div>
 
-          {/* ═══ Category Breakdown with progress bars ═══ */}
-          {Object.keys(byCategory).length > 0 && (
-            <div className="expenses-breakdown">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-text-muted mb-3">By Category</h3>
-              <div className="flex flex-col gap-1.5">
-                {EXPENSE_CATEGORIES.filter(c => byCategory[c.id]).map(cat => {
-                  const amount = byCategory[cat.id] || 0;
-                  const pct = totalExpense > 0 ? (amount / totalExpense) * 100 : 0;
-                  const budget = budgets.find(b => b.category === cat.id);
-                  const CatIcon = cat.icon;
-                  return (
-                    <div key={cat.id} className="expense-category-row">
-                      <div className="expense-category-row__left">
-                        <div className="expense-category-row__icon" style={{ backgroundColor: cat.color + '18' }}>
-                          <CatIcon className="w-3.5 h-3.5" style={{ color: cat.color }} />
-                        </div>
-                        <div className="expense-category-row__info">
-                          <span className="expense-category-row__name">{cat.label}</span>
-                          <div className="expense-category-row__bar-wrap">
-                            <div className="expense-category-row__bar"
-                              style={{ width: `${pct}%`, backgroundColor: cat.color }} />
-                          </div>
-                        </div>
-                      </div>
-                      <div className="expense-category-row__right">
-                        <span className="expense-category-row__amount">{fmtIQD(amount)}</span>
-                        <span className="expense-category-row__pct">{pct.toFixed(0)}%</span>
-                      </div>
+          {/* ═══ Insights Section ═══ */}
+          {insights.length > 0 && (
+            <div className="expenses-insights">
+              {insights.map((insight, i) => {
+                const Icon = insight.icon;
+                return (
+                  <div key={i} className="expense-insight-card" style={{ borderLeftColor: insight.color }}>
+                    <Icon className="w-4 h-4" style={{ color: insight.color }} />
+                    <div className="expense-insight-card__content">
+                      <span className="expense-insight-card__title">{insight.title}</span>
+                      <span className="expense-insight-card__message">{insight.message}</span>
                     </div>
-                  );
-                })}
-              </div>
+                  </div>
+                );
+              })}
             </div>
           )}
 
-          {/* ═══ Monthly Report Button ═══ */}
-          <div className="expenses-report-row">
-            <button
-              className="expenses-report-btn"
-              onClick={() => onNavigate?.('chat')}
-            >
-              <Sparkles className="w-4 h-4" />
-              <span>AI Monthly Report</span>
-            </button>
-          </div>
-
-          {/* ═══ Transaction List ═══ */}
-          <div className="expenses-list">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-text-muted mb-3">Transactions</h3>
-            {transactions.length === 0 ? (
-              <div className="expenses-list-empty">
-                <span className="expenses-list-empty__icon">💳</span>
-                <p className="expenses-list-empty__title">No transactions this month</p>
-                <p className="expenses-list-empty__sub">Tap Income or Expense to get started</p>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-1.5">
-                {transactions.map(exp => {
-                  const isIncome = exp.type === 'income';
-                  const source = isIncome ? INCOME_SOURCES.find(s => s.id === exp.category) : null;
-                  const cat = isIncome
-                    ? { icon: source?.icon || DollarSign, color: '#10b981', label: source?.label || 'Income' }
-                    : EXPENSE_CATEGORIES.find(c => c.id === exp.category) || EXPENSE_CATEGORIES.at(-1);
-                  const CatIcon = cat.icon;
-                  return (
-                    <div key={exp.id} className="expense-item">
-                      <div className="expense-item__icon" style={{ backgroundColor: cat.color + '18' }}>
-                        <CatIcon className="w-4 h-4" style={{ color: cat.color }} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-text truncate">{exp.note || cat.label}</p>
-                        <p className="text-[10px] text-text-muted">{format(new Date(exp.date), 'MMM d')}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-sm font-bold ${isIncome ? 'text-emerald-500' : 'text-text'}`}>
-                          {isIncome ? '+' : '-'}{fmtIQD(exp.amount)}
+          {/* ═══ AI Monthly Reports ═══ */}
+          <section className="expenses-section">
+            <div className="expenses-section__header">
+              <h2 className="expenses-section__title">
+                <Sparkles className="w-4 h-4 inline mr-2" />
+                AI Monthly Reports
+              </h2>
+              <span className="expenses-section__meta">{monthlyReports.length} report{monthlyReports.length > 1 ? 's' : ''}</span>
+            </div>
+            
+            {/* Generate Report Button - at top of section */}
+            <div className="expenses-ai-report expenses-ai-report--top">
+              <button 
+                className="expenses-ai-btn" 
+                onClick={generateMonthlyReport}
+                disabled={generatingReport || transactions.length === 0}
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>{generatingReport ? 'Generating AI Report...' : monthlyReports.length > 0 ? 'Regenerate Report' : 'Generate AI Report'}</span>
+                {!generatingReport && <Zap className="w-3.5 h-3.5 expenses-ai-btn__spark" />}
+              </button>
+              {transactions.length === 0 && (
+                <p className="expenses-ai-report__hint">Add transactions first to generate a report</p>
+              )}
+            </div>
+            
+            {monthlyReports.length > 0 && (
+              <div className="expenses-reports-grid">
+                {monthlyReports.map(report => (
+                  <div key={report.id} className="expense-report-card expense-report-card--clickable" onClick={() => setSelectedReport(report)}>
+                    <div className="expense-report-card__header">
+                      <h3 className="expense-report-card__title">{report.title}</h3>
+                      <div className="expense-report-card__header-actions">
+                        <span className="expense-report-card__date">
+                          {new Date(report.createdAt).toLocaleDateString()}
                         </span>
-                        <button onClick={() => deleteTransaction(exp.id)} className="expense-item__delete">
+                        <button 
+                          className="expense-report-card__delete"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteReport(report.id);
+                          }}
+                        >
                           <X className="w-3.5 h-3.5" />
                         </button>
+                      </div>
+                    </div>
+                    <div className="expense-report-card__summary">
+                      <div className="expense-report-stat">
+                        <span className="expense-report-stat__value">{fmtIQD(report.summary?.totalExpenses || 0)}</span>
+                        <span className="expense-report-stat__label">Total Spent</span>
+                      </div>
+                      <div className="expense-report-stat">
+                        <span className="expense-report-stat__value">{fmtIQD(report.summary?.totalIncome || 0)}</span>
+                        <span className="expense-report-stat__label">Income</span>
+                      </div>
+                      <div className="expense-report-stat">
+                        <span className={`expense-report-stat__value ${(report.summary?.netSavings || 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                          {fmtIQD(report.summary?.netSavings || 0)}
+                        </span>
+                        <span className="expense-report-stat__label">Net Savings</span>
+                      </div>
+                    </div>
+                    {report.categoryBreakdown && report.categoryBreakdown.length > 0 && (
+                      <div className="expense-report-card__categories">
+                        <span className="expense-report-card__label">Top Categories:</span>
+                        <div className="expense-report-categories">
+                          {report.categoryBreakdown.slice(0, 4).map((cat, i) => (
+                            <span key={i} className="expense-report-category-tag">
+                              {cat.category}: {fmtIQD(cat.amount)} ({cat.percentage}%)
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <div className="expense-report-card__action">
+                      <span>Click to view full report →</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* ═══ Category Breakdown ═══ */}
+          {Object.keys(byCategory).length > 0 && (
+            <section className="expenses-section">
+              <div className="expenses-section__header">
+                <h2 className="expenses-section__title">Spending by Category</h2>
+                <span className="expenses-section__meta">{Object.keys(byCategory).length} categories</span>
+              </div>
+              <div className="expenses-category-grid">
+                {EXPENSE_CATEGORIES
+                  .filter(c => byCategory[c.id])
+                  .sort((a, b) => (byCategory[b.id] || 0) - (byCategory[a.id] || 0))
+                  .map(cat => {
+                    const amount = byCategory[cat.id] || 0;
+                    const pct = totalExpense > 0 ? (amount / totalExpense) * 100 : 0;
+                    const CatIcon = cat.icon;
+                    return (
+                      <div key={cat.id} className="expense-category-card">
+                        <div className="expense-category-card__header">
+                          <div className="expense-category-card__icon" style={{ backgroundColor: cat.color + '15' }}>
+                            <CatIcon className="w-4 h-4" style={{ color: cat.color }} />
+                          </div>
+                          <div className="expense-category-card__info">
+                            <span className="expense-category-card__name">{cat.label}</span>
+                            <span className="expense-category-card__amount">{fmtIQD(amount)}</span>
+                          </div>
+                          <span className="expense-category-card__pct">{pct.toFixed(0)}%</span>
+                        </div>
+                        <div className="expense-category-card__bar">
+                          <div 
+                            className="expense-category-card__fill"
+                            style={{ width: `${pct}%`, backgroundColor: cat.color }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </section>
+          )}
+
+          {/* ═══ Transaction Timeline ═══ */}
+          <section className="expenses-section expenses-section--transactions">
+            <div className="expenses-section__header">
+              <h2 className="expenses-section__title">Transactions</h2>
+              <span className="expenses-section__meta">{transactionCount} total</span>
+            </div>
+            
+            {transactions.length === 0 ? (
+              <div className="expenses-empty-state">
+                <div className="expenses-empty-state__icon">💳</div>
+                <p className="expenses-empty-state__title">No transactions yet</p>
+                <p className="expenses-empty-state__subtitle">Add your first income or expense to get started</p>
+              </div>
+            ) : (
+              <div className="expenses-timeline">
+                {transactionsByDate.map(([date, dayTxns]) => {
+                  const dateObj = new Date(date);
+                  const isTodayDate = isToday(dateObj);
+                  const isYesterdayDate = isYesterday(dateObj);
+                  const dayTotal = dayTxns.reduce((s, t) => s + (t.type === 'expense' ? -t.amount : t.amount), 0);
+                  
+                  return (
+                    <div key={date} className="expenses-timeline__day">
+                      <div className="expenses-timeline__header">
+                        <div className="expenses-timeline__date">
+                          <span className="expenses-timeline__day-num">{format(dateObj, 'd')}</span>
+                          <div className="expenses-timeline__day-info">
+                            <span className="expenses-timeline__day-name">
+                              {isTodayDate ? 'Today' : isYesterdayDate ? 'Yesterday' : format(dateObj, 'EEEE')}
+                            </span>
+                            <span className="expenses-timeline__month">{format(dateObj, 'MMM')}</span>
+                          </div>
+                        </div>
+                        <div className={`expenses-timeline__day-total ${dayTotal >= 0 ? 'expenses-timeline__day-total--positive' : ''}`}>
+                          {dayTotal >= 0 ? '+' : ''}{fmtCompact(Math.abs(dayTotal))} IQD
+                        </div>
+                      </div>
+                      <div className="expenses-timeline__items">
+                        {dayTxns.map(txn => {
+                          const isIncome = txn.type === 'income';
+                          const source = isIncome ? INCOME_SOURCES.find(s => s.id === txn.category) : null;
+                          const cat = isIncome
+                            ? { icon: source?.icon || DollarSign, color: '#10b981', label: source?.label || 'Income' }
+                            : EXPENSE_CATEGORIES.find(c => c.id === txn.category) || EXPENSE_CATEGORIES.at(-1);
+                          const CatIcon = cat.icon;
+                          
+                          return (
+                            <div key={txn.id} className="expense-txn-item">
+                              <div className="expense-txn-item__icon" style={{ backgroundColor: cat.color + '15' }}>
+                                <CatIcon className="w-4 h-4" style={{ color: cat.color }} />
+                              </div>
+                              <div className="expense-txn-item__content">
+                                <span className="expense-txn-item__note">{txn.note || cat.label}</span>
+                              </div>
+                              <div className="expense-txn-item__right">
+                                <span className={`expense-txn-item__amount ${isIncome ? 'expense-txn-item__amount--income' : ''}`}>
+                                  {isIncome ? '+' : '-'}{fmtIQD(txn.amount)}
+                                </span>
+                                <button 
+                                  onClick={() => deleteTransaction(txn.id)} 
+                                  className="expense-txn-item__delete"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   );
                 })}
               </div>
             )}
-          </div>
+          </section>
         </>
       ) : (
-        /* ═══ Year Overview ═══ */
-        <YearOverview year={monthDate.getFullYear()} />
+        <YearOverview year={monthDate.getFullYear()} onMonthClick={(month) => {
+          setFilterMonth(month);
+          setViewTab('month');
+        }} />
       )}
 
       {/* ═══ Modals ═══ */}
@@ -279,12 +731,15 @@ export default function ExpensesView({ onNavigate }) {
       {showModal === 'income' && (
         <AddIncomeModal onSave={addTransaction} onClose={() => setShowModal(null)} />
       )}
+      {selectedReport && (
+        <ReportDetailModal report={selectedReport} onClose={() => setSelectedReport(null)} />
+      )}
     </div>
   );
 }
 
 /* ────── Year Overview Chart ────── */
-function YearOverview({ year }) {
+function YearOverview({ year, onMonthClick }) {
   const yearStart = `${year}-01-01`;
   const yearEnd   = `${year}-12-31`;
 
@@ -303,7 +758,7 @@ function YearOverview({ year }) {
     const monthTxns = allTransactions.filter(t => t.date?.startsWith(key));
     const income  = monthTxns.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
     const expense = monthTxns.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
-    return { month: format(m, 'MMM'), income, expense };
+    return { month: format(m, 'MMM'), key, income, expense };
   });
 
   const maxVal = Math.max(1, ...monthlyData.map(d => Math.max(d.income, d.expense)));
@@ -328,7 +783,7 @@ function YearOverview({ year }) {
 
       <div className="year-chart">
         {monthlyData.map((d, i) => (
-          <div key={i} className="year-chart__col">
+          <div key={i} className="year-chart__col year-chart__col--clickable" onClick={() => onMonthClick?.(d.key)}>
             <div className="year-chart__bars">
               <div className="year-chart__bar year-chart__bar--income"
                 style={{ height: `${(d.income / maxVal) * 100}%` }}
@@ -352,6 +807,8 @@ function YearOverview({ year }) {
           Expenses
         </span>
       </div>
+      
+      <p className="year-chart__hint">Click any month to see details</p>
     </div>
   );
 }
@@ -475,6 +932,133 @@ function AddIncomeModal({ onSave, onClose }) {
             Log Income
           </button>
         </form>
+      </div>
+    </div>
+  );
+}
+
+/* ────── Report Detail Modal ────── */
+function ReportDetailModal({ report, onClose }) {
+  if (!report) return null;
+  
+  const summary = report.summary || {};
+  const categories = report.categoryBreakdown || [];
+  
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content modal-content--report" onClick={e => e.stopPropagation()}>
+        <div className="report-modal__header">
+          <div>
+            <h2 className="report-modal__title">{report.title}</h2>
+            <span className="report-modal__date">{report.month}</span>
+          </div>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-surface-elevated transition-colors">
+            <X className="w-5 h-5 text-text-muted" />
+          </button>
+        </div>
+        
+        {/* Summary Stats */}
+        <div className="report-modal__section">
+          <h3 className="report-modal__section-title">📊 Summary</h3>
+          {summary.aiSummary && (
+            <p className="report-modal__ai-summary">{summary.aiSummary}</p>
+          )}
+          <div className="report-modal__stats-grid">
+            <div className="report-modal__stat">
+              <span className="report-modal__stat-value">{fmtIQD(summary.totalExpenses || 0)}</span>
+              <span className="report-modal__stat-label">Total Expenses</span>
+            </div>
+            <div className="report-modal__stat">
+              <span className="report-modal__stat-value">{fmtIQD(summary.totalIncome || 0)}</span>
+              <span className="report-modal__stat-label">Total Income</span>
+            </div>
+            <div className="report-modal__stat">
+              <span className={`report-modal__stat-value ${(summary.netSavings || 0) >= 0 ? 'report-modal__stat-value--positive' : 'report-modal__stat-value--negative'}`}>
+                {fmtIQD(summary.netSavings || 0)}
+              </span>
+              <span className="report-modal__stat-label">Net Savings</span>
+            </div>
+            <div className="report-modal__stat">
+              <span className="report-modal__stat-value">{summary.transactionCount || 0}</span>
+              <span className="report-modal__stat-label">Transactions</span>
+            </div>
+          </div>
+        </div>
+        
+        {/* Category Breakdown */}
+        {categories.length > 0 && (
+          <div className="report-modal__section">
+            <h3 className="report-modal__section-title">🏷️ Category Breakdown</h3>
+            <div className="report-modal__categories">
+              {categories.map((cat, i) => {
+                const catInfo = EXPENSE_CATEGORIES.find(c => c.id === cat.category);
+                const Icon = catInfo?.icon || MoreHorizontal;
+                return (
+                  <div key={i} className="report-modal__category-row">
+                    <div className="report-modal__category-info">
+                      <Icon className="w-4 h-4" style={{ color: catInfo?.color || '#6b7280' }} />
+                      <span className="report-modal__category-name">{catInfo?.label || cat.category}</span>
+                    </div>
+                    <div className="report-modal__category-bar">
+                      <div 
+                        className="report-modal__category-fill" 
+                        style={{ width: `${cat.percentage}%`, backgroundColor: catInfo?.color || '#6b7280' }}
+                      />
+                    </div>
+                    <div className="report-modal__category-amounts">
+                      <span className="report-modal__category-amount">{fmtIQD(cat.amount)}</span>
+                      <span className="report-modal__category-pct">{cat.percentage}%</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        
+        {/* Top Spending */}
+        {report.topSpendingCategories && report.topSpendingCategories.length > 0 && (
+          <div className="report-modal__section">
+            <h3 className="report-modal__section-title">🔥 Top Spending</h3>
+            <div className="report-modal__top-list">
+              {report.topSpendingCategories.map((cat, i) => (
+                <div key={i} className="report-modal__top-item">
+                  <span className="report-modal__top-rank">#{i + 1}</span>
+                  <span className="report-modal__top-name">{cat.category}</span>
+                  <span className="report-modal__top-amount">{fmtIQD(cat.amount)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        
+        {/* Insights */}
+        {report.insights && report.insights.length > 0 && (
+          <div className="report-modal__section">
+            <h3 className="report-modal__section-title">💡 Insights</h3>
+            <ul className="report-modal__insights">
+              {report.insights.map((insight, i) => (
+                <li key={i} className="report-modal__insight-item">
+                  {insight}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        
+        {/* Recommendations */}
+        {report.recommendations && report.recommendations.length > 0 && (
+          <div className="report-modal__section">
+            <h3 className="report-modal__section-title">✨ Recommendations</h3>
+            <ul className="report-modal__recommendations">
+              {report.recommendations.map((rec, i) => (
+                <li key={i} className="report-modal__rec-item">
+                  {rec}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,13 +1,12 @@
-import { useState, useEffect, useMemo } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { format } from 'date-fns';
 import {
   CheckSquare, Wallet, Target, Clock, Plus, Sparkles,
   TrendingUp, Calendar, ArrowRight, Eye, EyeOff, Settings2,
-  MessageCircle, X, Settings, Dumbbell, Compass
+  MessageCircle, X, Settings, Dumbbell, Compass, Play, Zap, Check
 } from 'lucide-react';
-import db from '../../db/dexie';
 import { usePreferences } from '../../hooks/usePreferences';
+import { useGlobalApp } from '../../context/GlobalAppContext';
 
 const STORAGE_KEY = 'ramadone_dashboard_widgets';
 const DEFAULT_VIS = { tasks: true, expenses: true, habits: true, calendar: true, gym: true, prayers: true };
@@ -16,13 +15,16 @@ const DEFAULT_VIS = { tasks: true, expenses: true, habits: true, calendar: true,
 const fmtIQD = (n) => Math.round(n).toLocaleString('en-US') + ' IQD';
 
 /**
- * Dashboard — richer widgets with real data, toggleable visibility,
- * preference persisted in IndexedDB (via localStorage fallback).
+ * Dashboard — instant rendering using globally pre-cached data.
+ * No loading states - data is already in memory when this renders.
  */
 export default function DashboardView({ onNavigate }) {
-  const today = format(new Date(), 'yyyy-MM-dd');
-  const { getPref } = usePreferences();
+  const { getPref, setPref } = usePreferences();
+  const globalApp = useGlobalApp();
   const prayerMode = getPref('prayerMode');
+  const gymWidgetMode = getPref('gymWidgetMode');
+  const gymWidgetShortcuts = getPref('gymWidgetShortcuts');
+  const prayersWidgetMode = getPref('prayersWidgetMode');
 
   // ─── Widget visibility ───
   const [widgetVis, setWidgetVis] = useState(() => {
@@ -31,6 +33,8 @@ export default function DashboardView({ onNavigate }) {
     } catch { return DEFAULT_VIS; }
   });
   const [showSettings, setShowSettings] = useState(false);
+  const [showGymSettings, setShowGymSettings] = useState(false);
+  const [showPrayersSettings, setShowPrayersSettings] = useState(false);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(widgetVis));
@@ -40,57 +44,31 @@ export default function DashboardView({ onNavigate }) {
     setWidgetVis(prev => ({ ...prev, [key]: !prev[key] }));
   }
 
-  // ─── Tasks data ───
-  const tasksDueToday = useLiveQuery(
-    () => db.tasks.where('dueDate').equals(today).toArray(), [today]
-  ) ?? [];
-  const tasksCompleted = useLiveQuery(() => db.tasks.where('completed').equals(1).count()) ?? 0;
-  const totalTasks = useLiveQuery(() => db.tasks.count()) ?? 0;
+  // ─── All data from global cache (instant, no loading) ───
+  const {
+    tasksDueToday,
+    expensesToday,
+    todaySpend,
+    todayIncome,
+    expenses,
+    habits,
+    habitsCheckedToday,
+    habitsNotDoneToday,
+    habitsPercent,
+    eventsToday,
+    todayPrayers,
+    weeklyWorkouts,
+    lastWorkout,
+    workoutPlans,
+  } = globalApp;
 
-  // ─── Expenses data ───
-  const todayExpenses = useLiveQuery(
-    () => db.expenses.where('date').equals(today).toArray(), [today]
-  ) ?? [];
+  // Compute next event
+  const nextEvent = useMemo(
+    () => eventsToday.sort((a, b) => (a.start || '').localeCompare(b.start || ''))[0],
+    [eventsToday]
+  );
 
-  const todaySpend = todayExpenses
-    .filter(e => e.type === 'expense')
-    .reduce((sum, e) => sum + (e.amount || 0), 0);
-
-  const todayIncome = todayExpenses
-    .filter(e => e.type === 'income')
-    .reduce((sum, e) => sum + (e.amount || 0), 0);
-
-  // top expense category
-  const topCategory = useMemo(() => {
-    const map = {};
-    todayExpenses.filter(e => e.type === 'expense').forEach(e => {
-      map[e.category] = (map[e.category] || 0) + e.amount;
-    });
-    const sorted = Object.entries(map).sort((a, b) => b[1] - a[1]);
-    return sorted[0] ? sorted[0][0] : null;
-  }, [todayExpenses]);
-
-  // ─── Habits data ───
-  const allHabits = useLiveQuery(() => db.habits.where('archived').equals(0).toArray()) ?? [];
-  const habitsChecked = useLiveQuery(
-    () => db.habitLogs.where('date').equals(today).filter(l => l.completed).count(), [today]
-  ) ?? 0;
-  const completedHabitIds = useLiveQuery(
-    () => db.habitLogs.where('date').equals(today).filter(l => l.completed).toArray(), [today]
-  ) ?? [];
-
-  const completedIdSet = new Set(completedHabitIds.map(l => l.habitId));
-  const habitsNotDone = allHabits.filter(h => !completedIdSet.has(h.id));
-  const habitPct = allHabits.length > 0 ? Math.round((habitsChecked / allHabits.length) * 100) : 0;
-
-  const todayEvents = useLiveQuery(
-    () => db.events.where('date').equals(today).toArray(), [today]
-  ) ?? [];
-  const nextEvent = todayEvents.sort((a, b) => (a.start || '').localeCompare(b.start || ''))[0];
-
-  // ─── Prayer data ───
-  const todayPrayers = useLiveQuery(() => db.prayerTimes.get(today), [today]);
-  
+  // Compute next prayer
   const nextPrayer = useMemo(() => {
     if (!todayPrayers) return null;
     const now = new Date();
@@ -100,7 +78,6 @@ export default function DashboardView({ onNavigate }) {
     for (const p of prayerNames) {
       const timeStr = todayPrayers[p];
       if (timeStr) {
-        // Simple approx parsing (assumes HH:MM 24h format for simplicity or standard string)
         const [h, m] = timeStr.split(':').map(Number);
         if (h * 60 + m > currentMinutes) {
           return { name: p, time: timeStr };
@@ -110,17 +87,24 @@ export default function DashboardView({ onNavigate }) {
     return { name: 'isha', time: todayPrayers.isha || '--:--' };
   }, [todayPrayers]);
 
-  // ─── Gym data ───
-  const lastWorkout = useLiveQuery(() => db.workoutLogs.orderBy('date').reverse().first());
-  
-  const weekAgo = new Date();
-  weekAgo.setDate(weekAgo.getDate() - 7);
-  const weekAgoStr = format(weekAgo, 'yyyy-MM-dd');
-  
-  const weeklyWorkouts = useLiveQuery(
-    () => db.workoutLogs.where('date').aboveOrEqual(weekAgoStr).toArray(),
-    [weekAgoStr]
-  ) ?? [];
+  // Compute top expense category
+  const topCategory = useMemo(() => {
+    const map = {};
+    expensesToday.filter(e => e.type === 'expense').forEach(e => {
+      map[e.category] = (map[e.category] || 0) + e.amount;
+    });
+    const sorted = Object.entries(map).sort((a, b) => b[1] - a[1]);
+    return sorted[0] ? sorted[0][0] : null;
+  }, [expensesToday]);
+
+  // Compute gym shortcut plans
+  const gymShortcuts = useMemo(() => {
+    if (gymWidgetMode !== 'shortcuts' || !gymWidgetShortcuts?.length) return [];
+    return gymWidgetShortcuts
+      .map(id => workoutPlans.find(p => p.id === id))
+      .filter(Boolean)
+      .slice(0, 4);
+  }, [gymWidgetMode, gymWidgetShortcuts, workoutPlans]);
 
   const greeting = getGreeting();
 
@@ -229,29 +213,17 @@ export default function DashboardView({ onNavigate }) {
               <ArrowRight className="w-3.5 h-3.5 text-text-muted ml-auto opacity-0 group-hover:opacity-100" />
             </div>
             <div className="dashboard-widget__body">
-              <span className="dashboard-widget__number">{tasksDueToday.length}</span>
-              <span className="dashboard-widget__subtitle">due today</span>
-            </div>
-            {/* Show actual task names */}
-            {tasksDueToday.length > 0 && (
-              <div className="dashboard-widget__detail-list">
-                {tasksDueToday.slice(0, 3).map(t => (
-                  <div key={t.id} className="dashboard-widget__detail-item">
-                    <span className={`dashboard-widget__detail-dot ${t.status === 'done' ? 'dashboard-widget__detail-dot--done' : ''}`} />
-                    <span className={`text-[11px] font-medium truncate ${t.status === 'done' ? 'line-through text-text-muted' : 'text-text'}`}>
-                      {t.title}
-                    </span>
-                  </div>
-                ))}
-                {tasksDueToday.length > 3 && (
-                  <span className="text-[10px] text-text-muted">+{tasksDueToday.length - 3} more</span>
-                )}
-              </div>
-            )}
-            <div className="dashboard-widget__footer">
-              <div className="dashboard-widget__stat-row">
-                <span className="text-[11px] text-text-muted">{tasksCompleted}/{totalTasks} completed overall</span>
-              </div>
+              {tasksDueToday.length > 0 ? (
+                <>
+                  <span className="dashboard-widget__number">{tasksDueToday.length}</span>
+                  <span className="dashboard-widget__subtitle">due today</span>
+                </>
+              ) : (
+                <>
+                  <span className="dashboard-widget__number text-emerald-500">✓</span>
+                  <span className="dashboard-widget__subtitle">No tasks due</span>
+                </>
+              )}
             </div>
           </button>
         )}
@@ -269,7 +241,7 @@ export default function DashboardView({ onNavigate }) {
             <div className="dashboard-widget__body">
               <span className="dashboard-widget__number">{fmtIQD(todaySpend)}</span>
               <span className="dashboard-widget__subtitle">
-                {todayExpenses.filter(e => e.type === 'expense').length} transactions
+                {expensesToday.filter(e => e.type === 'expense').length} transactions
               </span>
             </div>
             {todayIncome > 0 && (
@@ -299,28 +271,27 @@ export default function DashboardView({ onNavigate }) {
               <ArrowRight className="w-3.5 h-3.5 text-text-muted ml-auto opacity-0 group-hover:opacity-100" />
             </div>
             <div className="dashboard-widget__body">
-              <span className="dashboard-widget__number">{habitsChecked}<span className="text-base font-semibold text-text-muted">/{allHabits.length}</span></span>
-              <span className="dashboard-widget__subtitle">{habitPct}% completed</span>
+              <span className="dashboard-widget__number">{habitsCheckedToday}<span className="text-base font-semibold text-text-muted">/{habits.length}</span></span>
+              <span className="dashboard-widget__subtitle">{habitsPercent}% completed</span>
             </div>
-            {/* Show which habits are still undone */}
-            {habitsNotDone.length > 0 && habitsNotDone.length <= 4 && (
+            {habitsNotDoneToday.length > 0 && habitsNotDoneToday.length <= 4 && (
               <div className="dashboard-widget__detail-list">
-                {habitsNotDone.slice(0, 3).map(h => (
+                {habitsNotDoneToday.slice(0, 3).map(h => (
                   <div key={h.id} className="dashboard-widget__detail-item">
                     <span className="text-[11px]">{h.emoji}</span>
                     <span className="text-[11px] font-medium text-text-muted truncate">{h.name}</span>
                   </div>
                 ))}
-                {habitsNotDone.length > 3 && (
-                  <span className="text-[10px] text-text-muted">+{habitsNotDone.length - 3} more</span>
+                {habitsNotDoneToday.length > 3 && (
+                  <span className="text-[10px] text-text-muted">+{habitsNotDoneToday.length - 3} more</span>
                 )}
               </div>
             )}
-            {allHabits.length > 0 && (
+            {habits.length > 0 && (
               <div className="dashboard-widget__progress-bar">
                 <div
                   className="dashboard-widget__progress-fill"
-                  style={{ width: `${Math.min(100, habitPct)}%` }}
+                  style={{ width: `${Math.min(100, habitsPercent)}%` }}
                 />
               </div>
             )}
@@ -338,7 +309,7 @@ export default function DashboardView({ onNavigate }) {
               <ArrowRight className="w-3.5 h-3.5 text-text-muted ml-auto opacity-0 group-hover:opacity-100" />
             </div>
             <div className="dashboard-widget__body">
-              <span className="dashboard-widget__number">{todayEvents.length}</span>
+              <span className="dashboard-widget__number">{eventsToday.length}</span>
               <span className="dashboard-widget__subtitle">events today</span>
             </div>
             {nextEvent && (
@@ -354,54 +325,146 @@ export default function DashboardView({ onNavigate }) {
 
         {/* ── Prayers Widget ── */}
         {widgetVis.prayers && prayerMode && (
-          <button onClick={() => onNavigate('prayers')} className="dashboard-widget dashboard-widget--prayers">
+          <div className="dashboard-widget dashboard-widget--prayers" style={{ cursor: 'default' }}>
             <div className="dashboard-widget__header">
-              <div className="dashboard-widget__icon-wrap dashboard-widget__icon-wrap--teal" style={{background: 'rgba(20, 184, 166, 0.15)', color: '#14b8a6'}}>
+              <div className="dashboard-widget__icon-wrap dashboard-widget__icon-wrap--teal">
                 <Compass className="w-4 h-4" />
               </div>
               <span className="dashboard-widget__label">Prayers</span>
-              <ArrowRight className="w-3.5 h-3.5 text-text-muted ml-auto opacity-0 group-hover:opacity-100" />
+              <button
+                onClick={() => setShowPrayersSettings(true)}
+                className="ml-auto p-1 rounded hover:bg-[var(--c-border)] transition-colors"
+                title="Configure prayers widget"
+              >
+                <Settings2 className="w-3.5 h-3.5 text-text-muted" />
+              </button>
             </div>
-            <div className="dashboard-widget__body">
-              {nextPrayer ? (
-                <>
-                  <span className="dashboard-widget__number capitalize">{nextPrayer.name}</span>
-                  <span className="dashboard-widget__subtitle">{nextPrayer.time}</span>
-                </>
-              ) : (
-                <>
-                  <span className="dashboard-widget__number">--:--</span>
-                  <span className="dashboard-widget__subtitle">No prayer data</span>
-                </>
-              )}
-            </div>
-          </button>
+
+            {prayersWidgetMode === 'next' ? (
+              /* Next prayer mode - show upcoming prayer */
+              <button
+                onClick={() => onNavigate('prayers')}
+                className="w-full text-left"
+                style={{ cursor: 'pointer' }}
+              >
+                <div className="dashboard-widget__body">
+                  {nextPrayer ? (
+                    <>
+                      <span className="dashboard-widget__number capitalize">{nextPrayer.name}</span>
+                      <span className="dashboard-widget__subtitle">{nextPrayer.time}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="dashboard-widget__number">--:--</span>
+                      <span className="dashboard-widget__subtitle">No prayer data</span>
+                    </>
+                  )}
+                </div>
+              </button>
+            ) : (
+              /* All prayers mode - show all prayer times */
+              <button
+                onClick={() => onNavigate('prayers')}
+                className="w-full text-left"
+                style={{ cursor: 'pointer' }}
+              >
+                <div className="dashboard-widget__prayers-list">
+                  {todayPrayers ? (
+                    ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'].map(prayer => (
+                      <div key={prayer} className="dashboard-widget__prayer-row">
+                        <span className="dashboard-widget__prayer-name capitalize">{prayer}</span>
+                        <span className="dashboard-widget__prayer-time">{todayPrayers[prayer] || '--:--'}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <span className="text-[11px] text-text-muted py-2">No prayer data</span>
+                  )}
+                </div>
+              </button>
+            )}
+          </div>
         )}
 
         {/* ── Gym Widget ── */}
         {widgetVis.gym && (
-          <button onClick={() => onNavigate('gym')} className="dashboard-widget dashboard-widget--gym">
+          <div className="dashboard-widget dashboard-widget--gym" style={{ cursor: 'default' }}>
             <div className="dashboard-widget__header">
-              <div className="dashboard-widget__icon-wrap dashboard-widget__icon-wrap--orange" style={{background: 'rgba(249, 115, 22, 0.15)', color: '#f97316'}}>
+              <div className="dashboard-widget__icon-wrap dashboard-widget__icon-wrap--orange">
                 <Dumbbell className="w-4 h-4" />
               </div>
               <span className="dashboard-widget__label">Gym</span>
-              <ArrowRight className="w-3.5 h-3.5 text-text-muted ml-auto opacity-0 group-hover:opacity-100" />
+              <button
+                onClick={() => setShowGymSettings(true)}
+                className="ml-auto p-1 rounded hover:bg-[var(--c-border)] transition-colors"
+                title="Configure gym widget"
+              >
+                <Settings2 className="w-3.5 h-3.5 text-text-muted" />
+              </button>
             </div>
-            <div className="dashboard-widget__body">
-              <span className="dashboard-widget__number">{weeklyWorkouts.length}</span>
-              <span className="dashboard-widget__subtitle">sessions this week</span>
-            </div>
-            {lastWorkout && (
-              <div className="dashboard-widget__footer">
-                <span className="text-[11px] text-text-muted">
-                  Last: <strong className="text-text font-semibold">{lastWorkout.date}</strong>
-                </span>
+
+            {gymWidgetMode === 'sessions' ? (
+              /* Sessions mode - show weekly count */
+              <button
+                onClick={() => onNavigate('gym')}
+                className="w-full text-left"
+                style={{ cursor: 'pointer' }}
+              >
+                <div className="dashboard-widget__body">
+                  <span className="dashboard-widget__number">{weeklyWorkouts.length}</span>
+                  <span className="dashboard-widget__subtitle">sessions this week</span>
+                </div>
+              </button>
+            ) : (
+              /* Shortcuts mode - show plan shortcuts */
+              <div className="dashboard-widget__shortcuts">
+                {gymShortcuts.length > 0 ? (
+                  gymShortcuts.map(plan => (
+                    <button
+                      key={plan.id}
+                      onClick={() => onNavigate('gym')}
+                      className="dashboard-widget__shortcut-btn"
+                    >
+                      <Play className="w-3 h-3" fill="currentColor" />
+                      <span className="truncate">{plan.name}</span>
+                    </button>
+                  ))
+                ) : (
+                  <div className="text-[11px] text-text-muted py-2">
+                    No shortcuts configured. Click ⚙️ to add.
+                  </div>
+                )}
               </div>
             )}
-          </button>
+          </div>
         )}
       </div>
+
+      {/* ════ Gym Widget Settings Modal ════ */}
+      {showGymSettings && (
+        <GymWidgetSettingsModal
+          mode={gymWidgetMode}
+          shortcuts={gymWidgetShortcuts}
+          plans={workoutPlans}
+          onClose={() => setShowGymSettings(false)}
+          onSave={(mode, shortcuts) => {
+            setPref('gymWidgetMode', mode);
+            setPref('gymWidgetShortcuts', shortcuts);
+            setShowGymSettings(false);
+          }}
+        />
+      )}
+
+      {/* ════ Prayers Widget Settings Modal ════ */}
+      {showPrayersSettings && (
+        <PrayersWidgetSettingsModal
+          mode={prayersWidgetMode}
+          onClose={() => setShowPrayersSettings(false)}
+          onSave={(mode) => {
+            setPref('prayersWidgetMode', mode);
+            setShowPrayersSettings(false);
+          }}
+        />
+      )}
 
       {/* ════ AI Chat Button ════ */}
       <button onClick={() => onNavigate('chat')} className="dashboard-ai-fab">
@@ -409,6 +472,143 @@ export default function DashboardView({ onNavigate }) {
         <span>Ask AI Assistant</span>
         <Sparkles className="w-4 h-4 dashboard-ai-fab__sparkle" />
       </button>
+    </div>
+  );
+}
+
+/* ────── Gym Widget Settings Modal ────── */
+function GymWidgetSettingsModal({ mode, shortcuts, plans, onClose, onSave }) {
+  const [localMode, setLocalMode] = useState(mode);
+  const [localShortcuts, setLocalShortcuts] = useState(shortcuts || []);
+
+  function toggleShortcut(planId) {
+    setLocalShortcuts(prev => 
+      prev.includes(planId)
+        ? prev.filter(id => id !== planId)
+        : [...prev, planId].slice(0, 4)
+    );
+  }
+
+  return (
+    <div className="dash-modal-overlay" onClick={onClose}>
+      <div className="dash-modal gym-settings-modal" onClick={e => e.stopPropagation()}>
+        <div className="dash-modal__header">
+          <h2 className="text-base font-bold text-text">Gym Widget Settings</h2>
+          <button onClick={onClose} className="dash-modal__close">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="gym-settings-modal__content">
+          {/* Mode Selection */}
+          <div className="gym-settings-modal__section">
+            <label className="gym-settings-modal__label">Widget Mode</label>
+            <div className="gym-settings-modal__mode-btns">
+              <button
+                onClick={() => setLocalMode('sessions')}
+                className={`gym-mode-btn ${localMode === 'sessions' ? 'gym-mode-btn--active' : ''}`}
+              >
+                <Zap className="w-4 h-4" />
+                <span>Weekly Sessions</span>
+              </button>
+              <button
+                onClick={() => setLocalMode('shortcuts')}
+                className={`gym-mode-btn ${localMode === 'shortcuts' ? 'gym-mode-btn--active' : ''}`}
+              >
+                <Play className="w-4 h-4" />
+                <span>Plan Shortcuts</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Shortcuts Selection */}
+          {localMode === 'shortcuts' && (
+            <div className="gym-settings-modal__section">
+              <label className="gym-settings-modal__label">Select Plans (up to 4)</label>
+              {plans.length === 0 ? (
+                <p className="gym-settings-modal__empty">
+                  No workout plans yet. Create some in the Gym section first.
+                </p>
+              ) : (
+                <div className="gym-settings-modal__plan-list">
+                  {plans.map(plan => (
+                    <button
+                      key={plan.id}
+                      onClick={() => toggleShortcut(plan.id)}
+                      className={`gym-plan-select ${localShortcuts.includes(plan.id) ? 'gym-plan-select--selected' : ''}`}
+                    >
+                      <div className={`gym-plan-select__check ${localShortcuts.includes(plan.id) ? 'gym-plan-select__check--checked' : ''}`}>
+                        {localShortcuts.includes(plan.id) && <Check className="w-3 h-3" />}
+                      </div>
+                      <div className="gym-plan-select__info">
+                        <div className="gym-plan-select__name">{plan.name}</div>
+                        <div className="gym-plan-select__meta">{plan.type} · {plan.exercises?.length || 0} exercises</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Save Button */}
+        <button
+          onClick={() => onSave(localMode, localShortcuts)}
+          className="gym-settings-modal__save-btn"
+        >
+          Save Settings
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ────── Prayers Widget Settings Modal ────── */
+function PrayersWidgetSettingsModal({ mode, onClose, onSave }) {
+  const [localMode, setLocalMode] = useState(mode);
+
+  return (
+    <div className="dash-modal-overlay" onClick={onClose}>
+      <div className="dash-modal prayers-settings-modal" onClick={e => e.stopPropagation()}>
+        <div className="dash-modal__header">
+          <h2 className="text-base font-bold text-text">Prayers Widget Settings</h2>
+          <button onClick={onClose} className="dash-modal__close">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="prayers-settings-modal__content">
+          {/* Mode Selection */}
+          <div className="prayers-settings-modal__section">
+            <label className="prayers-settings-modal__label">Widget Mode</label>
+            <div className="prayers-settings-modal__mode-btns">
+              <button
+                onClick={() => setLocalMode('next')}
+                className={`prayers-mode-btn ${localMode === 'next' ? 'prayers-mode-btn--active' : ''}`}
+              >
+                <Compass className="w-4 h-4" />
+                <span>Next Prayer</span>
+              </button>
+              <button
+                onClick={() => setLocalMode('all')}
+                className={`prayers-mode-btn ${localMode === 'all' ? 'prayers-mode-btn--active' : ''}`}
+              >
+                <Clock className="w-4 h-4" />
+                <span>All Prayers</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Save Button */}
+        <button
+          onClick={() => onSave(localMode)}
+          className="prayers-settings-modal__save-btn"
+        >
+          Save Settings
+        </button>
+      </div>
     </div>
   );
 }

@@ -4,11 +4,15 @@
  * Preferences are stored as key-value pairs in IndexedDB.
  * This hook provides reactive reads and writes so the UI updates
  * instantly when a setting changes (e.g., theme or time format).
+ * 
+ * Uses localStorage as a synchronous cache for instant initial loads.
  */
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import db from '../db/dexie';
 import { applyTheme } from '../config/theme';
+
+const LOCAL_CACHE_KEY = 'ramadone_prefs_cache';
 
 /** Default preference values */
 const DEFAULTS = {
@@ -28,10 +32,46 @@ const DEFAULTS = {
   showHabits: true,
   showGym: true,
   showCalendar: true,
+  // Gym widget configuration
+  gymWidgetMode: 'sessions', // 'sessions' | 'shortcuts'
+  gymWidgetShortcuts: [], // array of workout plan IDs to show as shortcuts
+  // Prayers widget configuration
+  prayersWidgetMode: 'next', // 'next' | 'all'
+  // UI preferences
+  handedness: 'right', // 'left' | 'right' - for mobile FAB positioning
 };
 
 /**
+ * Synchronously read cached preferences from localStorage.
+ * Returns merged with defaults for instant UI rendering.
+ */
+function getCachedPrefs() {
+  try {
+    const cached = localStorage.getItem(LOCAL_CACHE_KEY);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      return { ...DEFAULTS, ...parsed };
+    }
+  } catch (e) {
+    // Ignore parse errors
+  }
+  return { ...DEFAULTS };
+}
+
+/**
+ * Save preferences to localStorage cache.
+ */
+function cachePrefs(prefs) {
+  try {
+    localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify(prefs));
+  } catch (e) {
+    // Ignore storage errors
+  }
+}
+
+/**
  * Hook for user preferences with reactive reads and upsert writes.
+ * Uses localStorage cache for instant synchronous initial load.
  *
  * @returns {{
  *   prefs: Record<string, any>,
@@ -40,19 +80,30 @@ const DEFAULTS = {
  * }}
  */
 export function usePreferences() {
+  // Start with cached prefs for instant render (no flash!)
+  const cachedPrefs = useMemo(() => getCachedPrefs(), []);
+  
   const rawPrefs = useLiveQuery(
     () => db.preferences.toArray(),
     [],
-    []
+    null // null = loading, not [] (so we can distinguish)
   );
 
-  // Convert array of { key, value } to a flat object, merged with defaults
-  const prefs = { ...DEFAULTS };
-  if (rawPrefs) {
+  // Merge: start with cache, overlay DB values if available
+  const prefs = useMemo(() => {
+    if (rawPrefs === null) {
+      // Still loading - use cached prefs
+      return cachedPrefs;
+    }
+    // DB loaded - merge with defaults and cache
+    const merged = { ...DEFAULTS };
     rawPrefs.forEach(({ key, value }) => {
-      prefs[key] = value;
+      merged[key] = value;
     });
-  }
+    // Update cache for next time
+    cachePrefs(merged);
+    return merged;
+  }, [rawPrefs, cachedPrefs]);
 
   /**
    * Get a specific preference value (with default fallback).
@@ -74,13 +125,18 @@ export function usePreferences() {
    * @param {any} value
    */
   const setPref = useCallback(async (key, value) => {
+    // Update cache immediately for instant UI feedback
+    const updated = { ...prefs, [key]: value };
+    cachePrefs(updated);
+    
+    // Persist to IndexedDB
     await db.preferences.put({ key, value });
 
     // Immediately apply theme changes so the UI reacts instantly
     if (key === 'theme') {
       applyTheme(value);
     }
-  }, []);
+  }, [prefs]);
 
   return { prefs, getPref, setPref };
 }

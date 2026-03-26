@@ -15,7 +15,8 @@ import { auth } from '../config/firebase';
 import {
   signInWithGoogle,
   signOutUser,
-  getAccessToken
+  getAccessToken,
+  trackUser
 } from '../services/authService';
 
 /**
@@ -61,6 +62,8 @@ export function useAuth() {
       const { user, accessToken } = await signInWithGoogle();
       setUser(user);
       setAccessToken(accessToken);
+      // Track user for admin dashboard
+      await trackUser(user);
     } catch (error) {
       console.error('[useAuth] Sign-in failed:', error);
       throw error;

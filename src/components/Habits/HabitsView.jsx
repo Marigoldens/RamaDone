@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { format, subDays, eachDayOfInterval } from 'date-fns';
+import { format, subDays, eachDayOfInterval, startOfWeek, endOfWeek } from 'date-fns';
 import {
   Plus, X, Flame, Trophy, Target, Check,
 } from 'lucide-react';
@@ -24,7 +24,7 @@ export default function HabitsView() {
     () => db.habitLogs.where('date').equals(today).toArray(), [today]
   ) ?? [];
 
-  // Last 7 days for the mini heatmap
+  // Last 7 days for the mini heatmap (daily habits)
   const last7 = useMemo(() => {
     const end = new Date();
     const start = subDays(end, 6);
@@ -34,6 +34,24 @@ export default function HabitsView() {
   const weekLogs = useLiveQuery(
     () => db.habitLogs.where('date').between(last7[0], last7[6], true, true).toArray(),
     [last7[0], last7[6]]
+  ) ?? [];
+
+  // Current week range for weekly habits
+  const currentWeek = useMemo(() => {
+    const now = new Date();
+    const start = startOfWeek(now, { weekStartsOn: 1 }); // Monday
+    const end = endOfWeek(now, { weekStartsOn: 1 });
+    return {
+      start: format(start, 'yyyy-MM-dd'),
+      end: format(end, 'yyyy-MM-dd'),
+      weekNum: format(now, 'w'),
+      year: format(now, 'yyyy')
+    };
+  }, []);
+
+  const weeklyLogs = useLiveQuery(
+    () => db.habitLogs.where('date').between(currentWeek.start, currentWeek.end, true, true).toArray(),
+    [currentWeek.start, currentWeek.end]
   ) ?? [];
 
   async function addHabit(data) {
@@ -64,10 +82,9 @@ export default function HabitsView() {
     await db.habits.update(id, { archived: 1 });
   }
 
-  // Calculate streak for each habit
-  function getStreak(habitId) {
+  // Calculate streak for daily habits (consecutive days)
+  function getDailyStreak(habitId) {
     const logs = weekLogs.filter(l => l.habitId === habitId && l.completed);
-    // Simple: count consecutive days from today backwards
     let streak = 0;
     for (let i = last7.length - 1; i >= 0; i--) {
       if (logs.some(l => l.date === last7[i])) {
@@ -77,7 +94,12 @@ export default function HabitsView() {
     return streak;
   }
 
-  const completedToday = habits.filter(h => todayLogs.some(l => l.habitId === h.id && l.completed)).length;
+  // Separate daily and weekly habits
+  const dailyHabits = habits.filter(h => h.frequency !== 'weekly');
+  const weeklyHabits = habits.filter(h => h.frequency === 'weekly');
+
+  const completedToday = dailyHabits.filter(h => todayLogs.some(l => l.habitId === h.id && l.completed)).length;
+  const completedThisWeek = weeklyHabits.filter(h => weeklyLogs.some(l => l.habitId === h.id && l.completed)).length;
 
   return (
     <div className="habits-view">
@@ -91,15 +113,28 @@ export default function HabitsView() {
           </button>
         </div>
         {/* Daily progress */}
-        {habits.length > 0 && (
+        {dailyHabits.length > 0 && (
           <div className="habits-daily-progress">
             <div className="flex items-center justify-between text-xs">
               <span className="text-text-muted font-semibold">Today's Progress</span>
-              <span className="text-accent font-bold">{completedToday}/{habits.length}</span>
+              <span className="text-accent font-bold">{completedToday}/{dailyHabits.length}</span>
             </div>
             <div className="habits-progress-bar">
               <div className="habits-progress-fill"
-                style={{ width: `${habits.length > 0 ? (completedToday / habits.length) * 100 : 0}%` }} />
+                style={{ width: `${dailyHabits.length > 0 ? (completedToday / dailyHabits.length) * 100 : 0}%` }} />
+            </div>
+          </div>
+        )}
+        {/* Weekly progress */}
+        {weeklyHabits.length > 0 && (
+          <div className="habits-daily-progress">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-text-muted font-semibold">This Week</span>
+              <span className="text-accent font-bold">{completedThisWeek}/{weeklyHabits.length}</span>
+            </div>
+            <div className="habits-progress-bar">
+              <div className="habits-progress-fill"
+                style={{ width: `${weeklyHabits.length > 0 ? (completedThisWeek / weeklyHabits.length) * 100 : 0}%` }} />
             </div>
           </div>
         )}
@@ -114,8 +149,11 @@ export default function HabitsView() {
           </div>
         ) : (
           habits.map(habit => {
-            const isChecked = todayLogs.some(l => l.habitId === habit.id && l.completed);
-            const streak = getStreak(habit.id);
+            const isWeekly = habit.frequency === 'weekly';
+            const isChecked = isWeekly
+              ? weeklyLogs.some(l => l.habitId === habit.id && l.completed)
+              : todayLogs.some(l => l.habitId === habit.id && l.completed);
+            const streak = isWeekly ? 0 : getDailyStreak(habit.id); // Weekly streaks not implemented yet
             return (
               <div key={habit.id} className={`habit-card ${isChecked ? 'habit-card--checked' : ''}`}>
                 <div className="flex items-center gap-3">
@@ -131,6 +169,9 @@ export default function HabitsView() {
                       <span className={`text-sm font-semibold ${isChecked ? 'text-text-muted line-through' : 'text-text'}`}>
                         {habit.name}
                       </span>
+                      {isWeekly && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-accent/20 text-accent font-medium">Weekly</span>
+                      )}
                     </div>
                     {habit.category && (
                       <span className="text-[10px] text-text-muted">{habit.category}</span>
@@ -149,19 +190,21 @@ export default function HabitsView() {
                   </button>
                 </div>
 
-                {/* Mini 7-day heatmap */}
-                <div className="habit-mini-heatmap">
-                  {last7.map(day => {
-                    const done = weekLogs.some(l => l.habitId === habit.id && l.date === day && l.completed);
-                    const isToday = day === today;
-                    return (
-                      <div key={day} className={`habit-heatmap-cell ${done ? 'habit-heatmap-cell--done' : ''} ${isToday ? 'habit-heatmap-cell--today' : ''}`}
-                        title={day}>
-                        <span className="text-[8px]">{format(new Date(day + 'T12:00:00'), 'EEE').charAt(0)}</span>
-                      </div>
-                    );
-                  })}
-                </div>
+                {/* Mini 7-day heatmap - only for daily habits */}
+                {!isWeekly && (
+                  <div className="habit-mini-heatmap">
+                    {last7.map(day => {
+                      const done = weekLogs.some(l => l.habitId === habit.id && l.date === day && l.completed);
+                      const isToday = day === today;
+                      return (
+                        <div key={day} className={`habit-heatmap-cell ${done ? 'habit-heatmap-cell--done' : ''} ${isToday ? 'habit-heatmap-cell--today' : ''}`}
+                          title={day}>
+                          <span className="text-[8px]">{format(new Date(day + 'T12:00:00'), 'EEE').charAt(0)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
           })

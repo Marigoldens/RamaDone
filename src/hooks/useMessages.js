@@ -70,6 +70,30 @@ export function useMessages(sessionId) {
     const sid = overrideSessionId || sessionId;
     if (!sid) throw new Error("No active session");
     
+    // Sanitize meta to ensure all values are serializable for IndexedDB
+    const sanitize = (obj) => {
+      if (!obj || typeof obj !== 'object') return obj;
+      if (Array.isArray(obj)) {
+        return obj.map(item => {
+          if (typeof item === 'function') return undefined;
+          if (item && typeof item === 'object') return sanitize(item);
+          return item;
+        }).filter(item => item !== undefined);
+      }
+      const clean = {};
+      for (const [k, v] of Object.entries(obj)) {
+        if (typeof v === 'function') continue;
+        if (v && typeof v === 'object') {
+          clean[k] = sanitize(v);
+        } else {
+          clean[k] = v;
+        }
+      }
+      return clean;
+    };
+    
+    const sanitizedMeta = sanitize(meta);
+    
     return await db.transaction('rw', db.chatSessions, db.messages, async () => {
       await db.chatSessions.update(sid, { updatedAt: Date.now() });
       return await db.messages.add({
@@ -77,7 +101,7 @@ export function useMessages(sessionId) {
         role,
         content,
         timestamp: Date.now(),
-        ...meta,
+        ...sanitizedMeta,
       });
     });
   }

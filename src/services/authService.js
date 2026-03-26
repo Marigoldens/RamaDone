@@ -69,3 +69,58 @@ export function getAccessToken() {
 export function setAccessToken(token) {
   cachedAccessToken = token;
 }
+
+/**
+ * Track user in local database for admin dashboard.
+ * Called after successful sign-in.
+ * @param {import('firebase/auth').User} user
+ */
+export async function trackUser(user) {
+  if (!user) return;
+  
+  const { db } = await import('../db/dexie');
+  
+  const userData = {
+    uid: user.uid,
+    email: user.email,
+    displayName: user.displayName,
+    photoURL: user.photoURL,
+    lastLogin: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+    totalMessages: 0,
+    totalTokens: 0,
+    lastAiRequest: null,
+  };
+  
+  // Upsert user - update if exists, insert if new
+  const existing = await db.users.where('uid').equals(user.uid).first();
+  if (existing) {
+    await db.users.update(existing.id, {
+      lastLogin: userData.lastLogin,
+      displayName: userData.displayName,
+      photoURL: userData.photoURL,
+    });
+  } else {
+    await db.users.add(userData);
+  }
+}
+
+/**
+ * Track AI usage for a user (call after each AI request).
+ * @param {string} uid - Firebase user UID
+ * @param {number} tokens - Approximate tokens used
+ */
+export async function trackAiUsage(uid, tokens = 0) {
+  if (!uid) return;
+  
+  const { db } = await import('../db/dexie');
+  
+  const existing = await db.users.where('uid').equals(uid).first();
+  if (existing) {
+    await db.users.update(existing.id, {
+      totalMessages: (existing.totalMessages || 0) + 1,
+      totalTokens: (existing.totalTokens || 0) + tokens,
+      lastAiRequest: new Date().toISOString(),
+    });
+  }
+}

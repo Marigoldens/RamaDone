@@ -92,6 +92,8 @@
 .dashboard-widget--expenses { border-left: 3px solid #10b981; }
 .dashboard-widget--habits   { border-left: 3px solid #8b5cf6; }
 .dashboard-widget--calendar { border-left: 3px solid var(--c-accent); }
+.dashboard-widget--prayers { border-left: 3px solid #14b8a6; }
+.dashboard-widget--gym      { border-left: 3px solid #f97316; }
 
 .dashboard-widget:hover {
   transform: translateY(-2px);
@@ -119,6 +121,8 @@
 .dashboard-widget__icon-wrap--green  { background: rgba(16, 185, 129, 0.12); color: #10b981; }
 .dashboard-widget__icon-wrap--purple { background: rgba(139, 92, 246, 0.12); color: #8b5cf6; }
 .dashboard-widget__icon-wrap--gold   { background: color-mix(in srgb, var(--c-accent) 12%, transparent); color: var(--c-accent); }
+.dashboard-widget__icon-wrap--teal   { background: rgba(20, 184, 166, 0.12); color: #14b8a6; }
+.dashboard-widget__icon-wrap--orange { background: rgba(249, 115, 22, 0.12); color: #f97316; }
 
 .dashboard-widget__label {
   font-size: 11px;
@@ -184,7 +188,296 @@
   height: 100%;
   border-radius: 999px;
   background: linear-gradient(90deg, #8b5cf6, #a78bfa);
-  transition: width 0.5s ease;
+  /* No transition on initial - renders instantly */
+}
+
+/* ── Gym widget shortcuts ── */
+.dashboard-widget__shortcuts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding-top: 0.25rem;
+}
+
+.dashboard-widget__shortcut-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.625rem;
+  border-radius: 8px;
+  background: rgba(249, 115, 22, 0.08);
+  color: #f97316;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid rgba(249, 115, 22, 0.15);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dashboard-widget__shortcut-btn:hover {
+  background: rgba(249, 115, 22, 0.15);
+  border-color: rgba(249, 115, 22, 0.3);
+  transform: translateX(2px);
+}
+
+/* ═══════════════════════════════════════════
+   GYM SETTINGS MODAL
+   ═══════════════════════════════════════════ */
+
+.gym-settings-modal {
+  max-width: 420px;
+}
+
+.gym-settings-modal__content {
+  padding: 1rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.gym-settings-modal__section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.gym-settings-modal__label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--c-text-muted);
+}
+
+.gym-settings-modal__empty {
+  font-size: 12px;
+  color: var(--c-text-muted);
+  padding: 0.75rem 0;
+}
+
+.gym-settings-modal__mode-btns {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.gym-mode-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--c-surface);
+  color: var(--c-text);
+  border: 1px solid var(--c-border);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.gym-mode-btn:hover {
+  border-color: var(--c-accent);
+}
+
+.gym-mode-btn--active {
+  background: var(--c-accent);
+  color: white;
+  border-color: var(--c-accent);
+}
+
+.gym-settings-modal__plan-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 200px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.gym-plan-select {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 10px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.gym-plan-select:hover {
+  border-color: var(--c-accent);
+}
+
+.gym-plan-select--selected {
+  background: rgba(249, 115, 22, 0.08);
+  border-color: #f97316;
+}
+
+.gym-plan-select__check {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: var(--c-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.gym-plan-select__check--checked {
+  background: #f97316;
+  color: white;
+}
+
+.gym-plan-select__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.gym-plan-select__name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-text);
+}
+
+.gym-plan-select__meta {
+  font-size: 10px;
+  color: var(--c-text-muted);
+  margin-top: 2px;
+}
+
+.gym-settings-modal__save-btn {
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  border-radius: 10px;
+  background: var(--c-accent);
+  color: white;
+  font-size: 13px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.gym-settings-modal__save-btn:hover {
+  opacity: 0.9;
+}
+
+/* ═══════════════════════════════════════════
+   PRAYERS SETTINGS MODAL
+   ═══════════════════════════════════════════ */
+
+.prayers-settings-modal {
+  max-width: 380px;
+}
+
+.prayers-settings-modal__content {
+  padding: 1rem 0;
+}
+
+.prayers-settings-modal__section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.prayers-settings-modal__label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--c-text-muted);
+}
+
+.prayers-settings-modal__mode-btns {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.prayers-mode-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--c-surface);
+  color: var(--c-text);
+  border: 1px solid var(--c-border);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.prayers-mode-btn:hover {
+  border-color: var(--c-accent);
+}
+
+.prayers-mode-btn--active {
+  background: var(--c-accent);
+  color: white;
+  border-color: var(--c-accent);
+}
+
+.prayers-settings-modal__save-btn {
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  border-radius: 10px;
+  background: var(--c-accent);
+  color: white;
+  font-size: 13px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.prayers-settings-modal__save-btn:hover {
+  opacity: 0.9;
+}
+
+/* ── Prayers list in widget ── */
+.dashboard-widget__prayers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding-top: 0.25rem;
+}
+
+.dashboard-widget__prayer-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.25rem 0;
+}
+
+.dashboard-widget__prayer-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--c-text-muted);
+  text-transform: capitalize;
+}
+
+.dashboard-widget__prayer-time {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--c-text);
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+}
+
+/* Only animate width changes AFTER initial render */
+.dashboard-widget--animated .dashboard-widget__progress-fill {
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ── Detail list inside widgets ── */
@@ -363,4 +656,156 @@
 @keyframes dashSparkle {
   0%, 100% { opacity: 0.6; transform: scale(1); }
   50%      { opacity: 1;   transform: scale(1.15); }
+}
+
+/* ═══════════════════════════════════════════
+   SKELETON LOADING STATES
+   ═══════════════════════════════════════════ */
+
+/* Skeleton base with shimmer effect */
+.dashboard-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--c-surface-elevated) 0%,
+    color-mix(in srgb, var(--c-text) 6%, var(--c-surface-elevated)) 50%,
+    var(--c-surface-elevated) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.5s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+@keyframes skeletonShimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Skeleton widget - matches widget dimensions */
+.dashboard-widget--skeleton {
+  background-color: var(--c-surface-elevated);
+  border: 1px solid var(--c-border);
+  border-radius: 16px;
+  padding: 0.875rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 120px;
+}
+
+.dashboard-skeleton__icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+}
+
+.dashboard-skeleton__label {
+  width: 60px;
+  height: 11px;
+  border-radius: 4px;
+}
+
+.dashboard-skeleton__number {
+  width: 80px;
+  height: 28px;
+  border-radius: 6px;
+  margin-top: 0.25rem;
+}
+
+.dashboard-skeleton__subtitle {
+  width: 100px;
+  height: 11px;
+  border-radius: 4px;
+}
+
+.dashboard-skeleton__footer {
+  width: 70%;
+  height: 11px;
+  border-radius: 4px;
+  margin-top: auto;
+}
+
+/* ═══════════════════════════════════════════
+   STAGGERED ENTRANCE ANIMATIONS
+   ═══════════════════════════════════════════ */
+
+/* Widget entrance animation */
+.dashboard-widget--enter {
+  opacity: 0;
+  transform: translateY(12px) scale(0.98);
+  animation: widgetEnter 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes widgetEnter {
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Staggered delays for each widget position */
+.dashboard-widget--enter:nth-child(1) { animation-delay: 0ms; }
+.dashboard-widget--enter:nth-child(2) { animation-delay: 50ms; }
+.dashboard-widget--enter:nth-child(3) { animation-delay: 100ms; }
+.dashboard-widget--enter:nth-child(4) { animation-delay: 150ms; }
+.dashboard-widget--enter:nth-child(5) { animation-delay: 200ms; }
+.dashboard-widget--enter:nth-child(6) { animation-delay: 250ms; }
+
+/* Quick actions entrance */
+.dashboard-quick-actions--enter {
+  opacity: 0;
+  transform: translateY(8px);
+  animation: quickActionsEnter 0.35s ease forwards;
+  animation-delay: 50ms;
+}
+
+@keyframes quickActionsEnter {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Header entrance */
+.dashboard-header--enter {
+  opacity: 0;
+  animation: headerEnter 0.3s ease forwards;
+}
+
+@keyframes headerEnter {
+  to { opacity: 1; }
+}
+
+/* FAB entrance */
+.dashboard-ai-fab--enter {
+  opacity: 0;
+  transform: translateY(16px) scale(0.9);
+  animation: fabEnter 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  animation-delay: 300ms;
+}
+
+@keyframes fabEnter {
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ═══════════════════════════════════════════
+   PERFORMANCE OPTIMIZATIONS
+   ═══════════════════════════════════════════ */
+
+/* Optimize widget rendering with GPU acceleration */
+.dashboard-widget {
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+}
+
+/* Reduce paint on hover states */
+.dashboard-widget:hover {
+  will-change: transform, box-shadow;
+}
+
+/* Optimize progress bar animation */
+.dashboard-widget__progress-fill {
+  will-change: width;
 }
