@@ -32,8 +32,8 @@ export default function ChatSidebar({
     : (sessions || []);
 
   // Separate starred from normal
-  const starred  = filtered.filter(s => s.starred);
-  const normal   = filtered.filter(s => !s.starred);
+  const starred = filtered.filter(s => s.starred);
+  const normal = filtered.filter(s => !s.starred);
 
   const handleNewChat = async () => {
     if (onNewChat) {
@@ -109,16 +109,16 @@ export default function ChatSidebar({
       )}
 
       <aside className={`chat-sidebar ${isMobileOpen ? 'chat-sidebar--open' : ''}`}>
-        {/* Brand header */}
-        <div className="chat-sidebar-brand">
+        {/* Brand header - hidden on md+ because there is a unified header above */}
+        <div className="chat-sidebar-brand md:hidden">
           <div
             className="chat-sidebar-brand-icon ai-gradient"
             style={{ color: '#fff' }}
           >
             <MessageSquare size={16} />
           </div>
-          <span className="chat-sidebar-brand-name">Ramadan AI</span>
-          <button className="chat-sidebar-close md-hidden" onClick={onCloseMobile} aria-label="Close sidebar">
+          <span className="chat-sidebar-brand-name">RamaDone AI</span>
+          <button className="chat-sidebar-close" onClick={onCloseMobile} aria-label="Close sidebar">
             <X size={16} />
           </button>
         </div>

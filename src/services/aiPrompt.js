@@ -8,11 +8,11 @@ export function buildTemporalContext(ramadanMode = false) {
   const todayLabel = format(now, "EEE d MMM yyyy");
   const tomorrow = addDays(now, 1);
   const weekStart = startOfWeek(now, { weekStartsOn: 1 });
-  const weekEnd   = endOfWeek(now,   { weekStartsOn: 1 });
+  const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
   const nextWeekStart = addDays(weekStart, 7);
-  const nextWeekEnd   = addDays(weekEnd,   7);
+  const nextWeekEnd = addDays(weekEnd, 7);
   const monthStart = startOfMonth(now);
-  const monthEnd   = endOfMonth(now);
+  const monthEnd = endOfMonth(now);
 
   const fmt = (d) => format(d, "EEE d MMM yyyy");
   const isoDate = (d) => format(d, "yyyy-MM-dd");
@@ -69,12 +69,12 @@ Asr      : ${fmt("Asr")}
 Maghrib  : ${fmt("Maghrib")}${ramadanMode ? '  ← this is Iftar time' : ''}
 Isha     : ${fmt("Isha")}${ramadanMode ? `
 Tarawih  : ~${fmt("Isha")} + 30 min after Isha (suggest ~${(() => {
-      const t = timings["Isha"];
-      if (!t) return "20:30";
-      const { hours, minutes } = parsePrayerTime(t);
-      const total = hours * 60 + minutes + 30;
-      return `${String(Math.floor(total / 60) % 24).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
-    })()})
+          const t = timings["Isha"];
+          if (!t) return "20:30";
+          const { hours, minutes } = parsePrayerTime(t);
+          const total = hours * 60 + minutes + 30;
+          return `${String(Math.floor(total / 60) % 24).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+        })()})
 
 When the user says "Iftar" use Maghrib time. When they say "Suhoor" suggest ~30–60 min before Fajr.` : ''}
 === END PRAYER TIMES ===`;
@@ -205,12 +205,12 @@ export function buildScopedSystemPrompt(mode, { ramadanMode, prayerTimes, produc
     });
   }
 
-  const greeting    = ramadanMode ? 'You are **Ramadan AI**' : 'You are **RamaDone AI**';
+  const greeting = ramadanMode ? 'You are **Ramadan AI**' : 'You are **RamaDone AI**';
   const personality = 'Be concise and action-oriented. Return Markdown. Never ask for confirmation — call the tool immediately.';
-  const TIMEZONE    = `⚠️ ALL TIMES are the user's LOCAL time (UTC+3). Never convert to UTC.`;
-  const CONFIRM     = `⚠️ Mutation tools show a confirmation card — just call them, do NOT ask "shall I proceed?".`;
-  const EDIT        = `⚠️ To change an existing item: QUERY it first to get the ID, then call update_*. Never delete+add instead of updating.`;
-  const todayStr    = format(new Date(), 'yyyy-MM-dd');
+  const TIMEZONE = `⚠️ ALL TIMES are the user's LOCAL time (UTC+3). Never convert to UTC.`;
+  const CONFIRM = `⚠️ Mutation tools show a confirmation card — just call them, do NOT ask "shall I proceed?".`;
+  const EDIT = `⚠️ To change an existing item: QUERY it first to get the ID, then call update_*. Never delete+add instead of updating.`;
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
 
   const { tasks = [], expenses = [], habits = [], habitLogs = [] } = productivityData || {};
 
@@ -256,10 +256,10 @@ ${list || '  (none)'}`;
   }
 
   if (mode === 'expenses') {
-    const todayExp   = expenses.filter(e => e.date === todayStr && e.type === 'expense');
-    const todayInc   = expenses.filter(e => e.date === todayStr && e.type === 'income');
+    const todayExp = expenses.filter(e => e.date === todayStr && e.type === 'expense');
+    const todayInc = expenses.filter(e => e.date === todayStr && e.type === 'income');
     const todaySpend = todayExp.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
-    const todayEarn  = todayInc.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+    const todayEarn = todayInc.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
     return `${greeting} — an expense & income tracking assistant.
 ${personality}
 

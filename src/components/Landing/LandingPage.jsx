@@ -22,14 +22,14 @@ import {
 
 /* ───────── Data ───────── */
 const FEATURES = [
-  { icon: LayoutDashboard, title: 'Dashboard',       desc: 'Unified home screen with real-time productivity stats, daily goals, and spiritual reminders.' },
-  { icon: Calendar,        title: 'Smart Calendar',   desc: 'Full Day/Week/Month views with seamless Google Calendar sync and event management.' },
-  { icon: CheckSquare,     title: 'Task Manager',     desc: 'Kanban boards and list views with priority levels and deep focus mode.' },
-  { icon: Wallet,          title: 'Expense Tracker',  desc: 'Local-first income and spending logs with AI-generated visual reports.' },
-  { icon: Target,          title: 'Habit Tracker',    desc: 'Cultivate consistency with streak counters, daily check-ins, and progress tracking.' },
-  { icon: Dumbbell,        title: 'Gym Tracker',      desc: 'Program-first workout management with AI parsing of workout notes.' },
-  { icon: Clock,           title: 'Prayer Times',     desc: 'Automatic GPS-based prayer times using the AlAdhan API with notifications.' },
-  { icon: MessageCircle,   title: 'AI Chat',          desc: '31 specialized AI tools powered by DeepSeek across productivity and spiritual growth.' },
+  { icon: LayoutDashboard, title: 'Dashboard', desc: 'Unified home screen with real-time productivity stats, daily goals, and spiritual reminders.' },
+  { icon: Calendar, title: 'Smart Calendar', desc: 'Full Day/Week/Month views with seamless Google Calendar sync and event management.' },
+  { icon: CheckSquare, title: 'Task Manager', desc: 'Kanban boards and list views with priority levels and deep focus mode.' },
+  { icon: Wallet, title: 'Expense Tracker', desc: 'Local-first income and spending logs with AI-generated visual reports.' },
+  { icon: Target, title: 'Habit Tracker', desc: 'Cultivate consistency with streak counters, daily check-ins, and progress tracking.' },
+  { icon: Dumbbell, title: 'Gym Tracker', desc: 'Program-first workout management with AI parsing of workout notes.' },
+  { icon: Clock, title: 'Prayer Times', desc: 'Automatic GPS-based prayer times using the AlAdhan API with notifications.' },
+  { icon: MessageCircle, title: 'AI Chat', desc: '31 specialized AI tools powered by DeepSeek across productivity and spiritual growth.' },
 ];
 
 const PRICING_FEATURES = [
@@ -220,7 +220,7 @@ export default function LandingPage({ onSignIn }) {
             <div className="landing__features-grid">
               {FEATURES.map(({ icon: Icon, title, desc }, idx) => (
                 <div key={title}
-                     className={`landing__feature-card landing-animate--stagger landing-animate--delay-${idx + 1}`}>
+                  className={`landing__feature-card landing-animate--stagger landing-animate--delay-${idx + 1}`}>
                   <div className="landing__feature-icon">
                     <Icon />
                   </div>

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Menu, Moon } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import { format } from 'date-fns';
 import { useLiveQuery } from 'dexie-react-hooks';
 
@@ -31,21 +31,21 @@ export default function ChatView({ user, accessToken }) {
   const { messages, sendMessage, updateMessageData } = useMessages(activeSessionId);
 
   const todayDate = format(new Date(), 'yyyy-MM-dd');
-  const eventsHook  = useEvents(todayDate);
-  const allEvents   = useAllEvents();
+  const eventsHook = useEvents(todayDate);
+  const allEvents = useAllEvents();
   const { prefs: preferences } = usePreferences();
 
   // Live productivity data for AI context and tool execution
-  const tasks     = useLiveQuery(() => db.tasks.toArray(),     [], []);
-  const expenses  = useLiveQuery(() => db.expenses.toArray(),  [], []);
-  const habits    = useLiveQuery(() => db.habits.where('archived').equals(0).toArray(), [], []);
+  const tasks = useLiveQuery(() => db.tasks.toArray(), [], []);
+  const expenses = useLiveQuery(() => db.expenses.toArray(), [], []);
+  const habits = useLiveQuery(() => db.habits.where('archived').equals(0).toArray(), [], []);
   const habitLogs = useLiveQuery(() => db.habitLogs.toArray(), [], []);
   const workoutPlans = useLiveQuery(() => db.workoutPlans.orderBy('createdAt').reverse().toArray(), [], []);
-  const workoutLogs  = useLiveQuery(() => db.workoutLogs.orderBy('date').reverse().toArray(), [], []);
+  const workoutLogs = useLiveQuery(() => db.workoutLogs.orderBy('date').reverse().toArray(), [], []);
   const productivityData = { tasks, expenses, habits, habitLogs, workoutPlans, workoutLogs };
 
   const ramadanMode = preferences?.ramadanMode ?? false;
-  const prayerMode  = preferences?.prayerMode  ?? true;
+  const prayerMode = preferences?.prayerMode ?? true;
   const injectPrayerContext = preferences?.injectPrayerContext ?? false;
 
   // ── Prayer times ──
@@ -81,10 +81,10 @@ export default function ChatView({ user, accessToken }) {
   }, [preferences.latitude, preferences.longitude, preferences.calcMethod, prayerMode]);
 
   // ── UI state ──
-  const [input, setInput]   = useState('');
+  const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef(null);
-  const inputRef  = useRef(null);
+  const inputRef = useRef(null);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -200,7 +200,7 @@ export default function ChatView({ user, accessToken }) {
 
       // ── Handle function calls ──────────────────────────────────────────────
       if (aiResponse.isFunctionCall) {
-        const batchedEvents  = [];
+        const batchedEvents = [];
         const batchedDeletes = [];
         const batchedUpdates = [];
         const allPendingCalls = [];
@@ -211,9 +211,9 @@ export default function ChatView({ user, accessToken }) {
         const pushAddEvent = (args) => {
           batchedEvents.push({
             ...args,
-            date:      args.start ? args.start.split('T')[0] : null,
+            date: args.start ? args.start.split('T')[0] : null,
             startTime: args.start ? format(new Date(args.start), 'HH:mm') : '',
-            endTime:   args.end   ? format(new Date(args.end),   'HH:mm') : '',
+            endTime: args.end ? format(new Date(args.end), 'HH:mm') : '',
           });
           allPendingCalls.push({ name: 'add_event', args });
         };
@@ -223,22 +223,22 @@ export default function ChatView({ user, accessToken }) {
           const t = tasks?.find(x => x.id === call.args.id);
           const h = habits?.find(x => x.id === call.args.habitId);
           switch (call.name) {
-            case 'add_task':     return { tool: call.name, args: call.args, display: `Add task: "${call.args.title}"`,                       sub: `Priority: ${call.args.priority || 'medium'}${call.args.dueDate ? ` · Due ${call.args.dueDate}` : ''}` };
-            case 'update_task':  return { tool: call.name, args: call.args, display: `Update task: "${t?.title || `#${call.args.id}`}"`,       sub: JSON.stringify(call.args.updates) };
-            case 'delete_task':  return { tool: call.name, args: call.args, display: `Delete task: "${t?.title || `#${call.args.id}`}"`,       sub: 'Cannot be undone', danger: true };
-            case 'add_expense':  return { tool: call.name, args: call.args, display: `Log ${call.args.type}: ${call.args.amount} · ${call.args.category}`, sub: call.args.note || call.args.date || todayDate };
-            case 'update_expense': return { tool: call.name, args: call.args, display: `Edit expense #${call.args.id}`,                       sub: Object.entries(call.args.updates || {}).map(([k,v]) => `${k}: ${v}`).join(', ') };
-            case 'delete_expense': return { tool: call.name, args: call.args, display: `Delete entry #${call.args.id}`,                       sub: 'Expense entry', danger: true };
-            case 'add_habit':    return { tool: call.name, args: call.args, display: `Add habit: "${call.args.name}"`,                        sub: `${call.args.emoji || '🎯'} · ${call.args.frequency || 'daily'}${call.args.category ? ` · ${call.args.category}` : ''}` };
-            case 'update_habit': return { tool: call.name, args: call.args, display: `Edit habit: "${h?.name || `Habit #${call.args.habitId}`}"`, sub: Object.entries(call.args.updates || {}).map(([k,v]) => `${k}: ${v}`).join(', ') };
+            case 'add_task': return { tool: call.name, args: call.args, display: `Add task: "${call.args.title}"`, sub: `Priority: ${call.args.priority || 'medium'}${call.args.dueDate ? ` · Due ${call.args.dueDate}` : ''}` };
+            case 'update_task': return { tool: call.name, args: call.args, display: `Update task: "${t?.title || `#${call.args.id}`}"`, sub: JSON.stringify(call.args.updates) };
+            case 'delete_task': return { tool: call.name, args: call.args, display: `Delete task: "${t?.title || `#${call.args.id}`}"`, sub: 'Cannot be undone', danger: true };
+            case 'add_expense': return { tool: call.name, args: call.args, display: `Log ${call.args.type}: ${call.args.amount} · ${call.args.category}`, sub: call.args.note || call.args.date || todayDate };
+            case 'update_expense': return { tool: call.name, args: call.args, display: `Edit expense #${call.args.id}`, sub: Object.entries(call.args.updates || {}).map(([k, v]) => `${k}: ${v}`).join(', ') };
+            case 'delete_expense': return { tool: call.name, args: call.args, display: `Delete entry #${call.args.id}`, sub: 'Expense entry', danger: true };
+            case 'add_habit': return { tool: call.name, args: call.args, display: `Add habit: "${call.args.name}"`, sub: `${call.args.emoji || '🎯'} · ${call.args.frequency || 'daily'}${call.args.category ? ` · ${call.args.category}` : ''}` };
+            case 'update_habit': return { tool: call.name, args: call.args, display: `Edit habit: "${h?.name || `Habit #${call.args.habitId}`}"`, sub: Object.entries(call.args.updates || {}).map(([k, v]) => `${k}: ${v}`).join(', ') };
             case 'delete_habit': return { tool: call.name, args: call.args, display: `Archive habit: "${h?.name || `Habit #${call.args.habitId}`}"`, sub: 'Habit will be hidden', danger: true };
-            case 'log_habit':    return { tool: call.name, args: call.args, display: `${call.args.completed ? '✅ Mark done' : '↩️ Undo'}: "${h?.name || `Habit #${call.args.habitId}`}"`, sub: `Date: ${call.args.date}` };
-            case 'add_workout_plan':    return { tool: call.name, args: call.args, display: `Create plan: "${call.args.name}"`, sub: `${call.args.type} · ${(call.args.exercises || []).length} exercises` };
-            case 'update_workout_plan': return { tool: call.name, args: call.args, display: `Update plan #${call.args.id}`, sub: Object.entries(call.args.updates || {}).map(([k,v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join(', ') };
+            case 'log_habit': return { tool: call.name, args: call.args, display: `${call.args.completed ? '✅ Mark done' : '↩️ Undo'}: "${h?.name || `Habit #${call.args.habitId}`}"`, sub: `Date: ${call.args.date}` };
+            case 'add_workout_plan': return { tool: call.name, args: call.args, display: `Create plan: "${call.args.name}"`, sub: `${call.args.type} · ${(call.args.exercises || []).length} exercises` };
+            case 'update_workout_plan': return { tool: call.name, args: call.args, display: `Update plan #${call.args.id}`, sub: Object.entries(call.args.updates || {}).map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join(', ') };
             case 'delete_workout_plan': return { tool: call.name, args: call.args, display: `Delete plan: "${call.args.planName || `#${call.args.id}`}"`, sub: 'Cannot be undone', danger: true };
-            case 'add_workout_log':     return { tool: call.name, args: call.args, display: `Log workout: "${call.args.planName}"`, sub: `${(call.args.exercises || []).length} exercises` };
-            case 'delete_workout_log':  return { tool: call.name, args: call.args, display: `Delete workout log #${call.args.id}`, sub: 'Cannot be undone', danger: true };
-            default:             return null;
+            case 'add_workout_log': return { tool: call.name, args: call.args, display: `Log workout: "${call.args.planName}"`, sub: `${(call.args.exercises || []).length} exercises` };
+            case 'delete_workout_log': return { tool: call.name, args: call.args, display: `Delete workout log #${call.args.id}`, sub: 'Cannot be undone', danger: true };
+            default: return null;
           }
         };
 
@@ -370,7 +370,7 @@ export default function ChatView({ user, accessToken }) {
   // (The bar is ephemeral per-session context, not tied to the saved label)
   useEffect(() => {
     setChatMode('all');
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSessionId]);
 
   // ── Handle mode change: local state only, never writes to DB ──
@@ -380,78 +380,72 @@ export default function ChatView({ user, accessToken }) {
   };
 
   return (
-    <div className="chat-root">
-      {/* Sidebar */}
-      <ChatSidebar
-        activeSessionId={activeSessionId}
-        onSelectSession={setActiveSessionId}
-        isMobileOpen={isSidebarOpen}
-        onCloseMobile={() => setIsSidebarOpen(false)}
-        activeChatMode={chatMode}
-        onNewChat={() => { setActiveSessionId(null); }}
-      />
+    <div className="chat-root flex-col">
+      {/* Unified Top Header Ribbon */}
+      <header className="chat-header unified-header relative flex items-center justify-start md:justify-center w-full border-b border-[var(--c-border)] bg-[var(--c-surface)] z-10">
+        <div className="flex justify-start md:justify-center flex-1 w-full">
+          <ChatModeBar
+            activeMode={currentMode}
+            onModeChange={handleModeChange}
+            leftElement={
+              <button
+                className="chat-menu-btn md:hidden shrink-0 flex items-center justify-center px-4 py-2 rounded-full hover:bg-[var(--c-border)] transition-colors"
+                onClick={() => setIsSidebarOpen(true)}
+                aria-label="Open sidebar"
+              >
+                <Menu className="w-6 h-6 text-[var(--c-text-muted)] hover:text-[var(--c-text)]" />
+              </button>
+            }
+          />
+        </div>
+      </header>
 
-      {/* Main Area */}
-      <div className="chat-main">
-        {/* Header */}
-        <header className="chat-header">
-          <div className="chat-header-left">
-            <button
-              className="chat-menu-btn md:hidden"
-              onClick={() => setIsSidebarOpen(true)}
-              aria-label="Open sidebar"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-            <div className="chat-header-icon" style={{ background: `var(--color-mode-${currentMode || 'all'})` }}>
-              <Moon className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <h1 className="chat-header-title">{ramadanMode ? 'Ramadan AI' : 'RamaDone AI'}</h1>
-              <p className="chat-header-subtitle" style={{ color: `var(--color-mode-${currentMode || 'all'})`, opacity: 0.8 }}>Powered by DeepSeek</p>
-            </div>
-          </div>
-          <div className="chat-status-pill">
-            <span className="chat-status-dot" style={{ backgroundColor: `var(--color-mode-${currentMode || 'all'})` }} />
-            <span>Online</span>
-          </div>
-        </header>
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Sidebar */}
+        <ChatSidebar
+          activeSessionId={activeSessionId}
+          onSelectSession={(id) => { setActiveSessionId(id); setIsSidebarOpen(false); }}
+          isMobileOpen={isSidebarOpen}
+          onCloseMobile={() => setIsSidebarOpen(false)}
+          activeChatMode={chatMode}
+          onNewChat={() => { setActiveSessionId(null); setIsSidebarOpen(false); }}
+        />
 
-        {/* Mode selector bar */}
-        <ChatModeBar activeMode={currentMode} onModeChange={handleModeChange} />
-
-        {/* Messages / empty state */}
-        {showEmptyState ? (
-          <div className="chat-messages-scroll">
-            <div className="chat-messages-inner">
-              <ChatEmptyState
-                activeMode={chatMode}
-                ramadanMode={ramadanMode}
-                onSendSuggestion={handleSend}
-              />
+        {/* Main Area */}
+        <div className="chat-main">
+          {/* Messages / empty state */}
+          {showEmptyState ? (
+            <div className="chat-messages-scroll">
+              <div className="chat-messages-inner">
+                <ChatEmptyState
+                  activeMode={chatMode}
+                  ramadanMode={ramadanMode}
+                  onSendSuggestion={handleSend}
+                />
+              </div>
             </div>
-          </div>
-        ) : (
-          <ChatMessageList
-            messages={messages}
+          ) : (
+            <ChatMessageList
+              messages={messages}
+              loading={loading}
+              scrollRef={scrollRef}
+              onConfirmEvents={handleConfirmEvents}
+              onConfirmProductivity={handleConfirmProductivity}
+              activeMode={currentMode}
+            />
+          )}
+
+          {/* Input bar */}
+          <ChatInputBar
+            input={input}
+            setInput={setInput}
             loading={loading}
-            scrollRef={scrollRef}
-            onConfirmEvents={handleConfirmEvents}
-            onConfirmProductivity={handleConfirmProductivity}
+            onSend={handleSend}
+            inputRef={inputRef}
+            ramadanMode={ramadanMode}
             activeMode={currentMode}
           />
-        )}
-
-        {/* Input bar */}
-        <ChatInputBar
-          input={input}
-          setInput={setInput}
-          loading={loading}
-          onSend={handleSend}
-          inputRef={inputRef}
-          ramadanMode={ramadanMode}
-          activeMode={currentMode}
-        />
+        </div>
       </div>
     </div>
   );

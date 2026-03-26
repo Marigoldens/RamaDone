@@ -66,11 +66,12 @@ export const MODE_PLACEHOLDERS = {
  * Shows a lock icon when the user has manually selected a non-'all' mode
  * to communicate that AI auto-detection is disabled.
  */
-export default function ChatModeBar({ activeMode, onModeChange }) {
+export default function ChatModeBar({ activeMode, onModeChange, leftElement }) {
   const isLocked = activeMode !== 'all';
 
   return (
     <div className="chat-mode-bar" role="toolbar" aria-label="Chat mode selector">
+      {leftElement}
       {CHAT_MODES.map(({ id, label, Icon, color }) => {
         const isActive = activeMode === id;
         return (
