@@ -11,7 +11,7 @@
  * RESULT: Zero loading time on every page - everything is pre-cached.
  */
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { format, subDays, startOfMonth, endOfMonth, addMonths, isSameMonth } from 'date-fns';
+import { format, subDays, startOfMonth, endOfMonth, addMonths, isSameMonth, startOfWeek, endOfWeek } from 'date-fns';
 import db from '../db/dexie';
 import { fetchMonthPrayerTimes, parsePrayerTime } from '../services/prayerService';
 
@@ -47,6 +47,17 @@ export function GlobalAppProvider({ children }) {
   const [workoutPlans, setWorkoutPlans] = useState([]);
   const [preferences, setPreferences] = useState({});
   const [chatSessions, setChatSessions] = useState([]);
+  
+  // ─── Sidebar UI State ───
+  const [starredCollapsed, setStarredCollapsed] = useState(() => {
+    const saved = localStorage.getItem('chat-sidebar-starred-collapsed');
+    return saved ? JSON.parse(saved) : false;
+  });
+  
+  // Persist sidebar state
+  useEffect(() => {
+    localStorage.setItem('chat-sidebar-starred-collapsed', JSON.stringify(starredCollapsed));
+  }, [starredCollapsed]);
   
   // Track last synced prayer month/method to avoid redundant API calls
   const lastPrayerSyncRef = useRef({ month: null, year: null, method: null, lat: null, lon: null });
@@ -230,17 +241,45 @@ export function GlobalAppProvider({ children }) {
     [expensesToday]
   );
 
-  // Habits helpers
+  // Habits helpers - properly handle daily vs weekly habits
   const habitsCheckedToday = useMemo(() => {
     const todayLogs = habitLogs.filter(l => l.date === today && l.completed);
-    return todayLogs.length;
-  }, [habitLogs, today]);
-  const habitsNotDoneToday = useMemo(() => {
-    const todayCompletedIds = new Set(
-      habitLogs.filter(l => l.date === today && l.completed).map(l => l.habitId)
-    );
-    return habits.filter(h => !todayCompletedIds.has(h.id));
+    const todayCompletedIds = new Set(todayLogs.map(l => l.habitId));
+    
+    // Count daily habits done today
+    const dailyDone = habits.filter(h => h.frequency !== 'weekly' && todayCompletedIds.has(h.id)).length;
+    
+    // Count weekly habits done this week
+    const now = new Date();
+    const weekStart = format(startOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+    const weekEnd = format(endOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+    const weekLogs = habitLogs.filter(l => l.date >= weekStart && l.date <= weekEnd && l.completed);
+    const weekCompletedIds = new Set(weekLogs.map(l => l.habitId));
+    const weeklyDone = habits.filter(h => h.frequency === 'weekly' && weekCompletedIds.has(h.id)).length;
+    
+    return dailyDone + weeklyDone;
   }, [habits, habitLogs, today]);
+  
+  const habitsNotDoneToday = useMemo(() => {
+    const todayLogs = habitLogs.filter(l => l.date === today && l.completed);
+    const todayCompletedIds = new Set(todayLogs.map(l => l.habitId));
+    
+    // Get weekly logs for this week
+    const now = new Date();
+    const weekStart = format(startOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+    const weekEnd = format(endOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+    const weekLogs = habitLogs.filter(l => l.date >= weekStart && l.date <= weekEnd && l.completed);
+    const weekCompletedIds = new Set(weekLogs.map(l => l.habitId));
+    
+    // Return habits not done (daily not done today, weekly not done this week)
+    return habits.filter(h => {
+      if (h.frequency === 'weekly') {
+        return !weekCompletedIds.has(h.id);
+      }
+      return !todayCompletedIds.has(h.id);
+    });
+  }, [habits, habitLogs, today]);
+  
   const habitsPercent = useMemo(
     () => habits.length > 0 ? Math.round((habitsCheckedToday / habits.length) * 100) : 0,
     [habitsCheckedToday, habits]
@@ -301,6 +340,9 @@ export function GlobalAppProvider({ children }) {
     workoutPlans,
     preferences,
     chatSessions,
+    // Sidebar state
+    starredCollapsed,
+    setStarredCollapsed,
     // Computed helpers
     today,
     tasksDueToday,
@@ -321,6 +363,7 @@ export function GlobalAppProvider({ children }) {
   }), [
     isPreloaded,
     tasks, expenses, habits, habitLogs, events, prayerTimes, workoutLogs, workoutPlans, preferences, chatSessions,
+    starredCollapsed,
     today, tasksDueToday, tasksCompleted, expensesToday, todaySpend, todayIncome,
     habitsCheckedToday, habitsNotDoneToday, habitsPercent, eventsToday, todayPrayers, weeklyWorkouts, lastWorkout,
     refreshAll, syncPrayerMonth,

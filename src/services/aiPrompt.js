@@ -157,6 +157,8 @@ Examples:
 SCHEDULING RULES:
 ${ramadanRules}
 - BATCHING (CRITICAL): If the user asks for MULTIPLE actions, output ALL function calls simultaneously in ONE response.
+- MULTI-TYPE REQUESTS (CRITICAL): When the user asks for DIFFERENT types of items (e.g., "make 3 habits, 5 events, 2 tasks"), you MUST call tools for ALL types in ONE response. Do NOT stop after one type. Call ALL relevant tools: add_habit, add_event, add_task, add_expense, add_workout_plan, add_workout_log — whatever the user requested.
+- Example: "make 2 habits, 3 events, and log an expense" → call add_habit twice, add_event three times, add_expense once — ALL in ONE response.
 - SKIPPING CHECKS: For multi-event requests, you may skip 'check_conflicts' if slots are obviously distinct.
 - When intent is clear for a single event, call check_conflicts ONCE then immediately call add_event.
 - When the user asks "what's my day?" or "what's on?", call get_day_narrative.

@@ -10,6 +10,7 @@ import { VitePWA } from 'vite-plugin-pwa';
  * - @tailwindcss/vite plugin for zero-config Tailwind v4 integration
  * - VitePWA in generateSW mode for automatic service-worker generation
  * - Offline-first caching: all static assets + API responses cached
+ * - Dynamic themed icons via SVG (color can be changed at runtime)
  */
 export default defineConfig({
   server: {
@@ -22,27 +23,28 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'icons/*.png'],
+      includeAssets: ['favicon.svg', 'icons/*.svg'],
       manifest: {
-        name: 'Ramadan Rhythm Scheduler',
-        short_name: 'RamadanRhythm',
+        name: 'RamaDone',
+        short_name: 'RamaDone',
         description: 'AI-powered Ramadan schedule planner with prayer times & Google Calendar sync',
-        theme_color: '#0f172a',
-        background_color: '#0f172a',
+        theme_color: '#2563eb',
+        background_color: '#ffffff',
         display: 'standalone',
         orientation: 'portrait',
         start_url: '/',
         icons: [
           {
-            src: '/icons/icon-192.svg',
-            sizes: '192x192',
+            src: '/icons/icon-app.svg',
+            sizes: 'any',
             type: 'image/svg+xml',
+            purpose: 'any',
           },
           {
-            src: '/icons/icon-192.svg',
-            sizes: '512x512',
+            src: '/icons/icon-app.svg',
+            sizes: 'any',
             type: 'image/svg+xml',
-            purpose: 'any maskable',
+            purpose: 'maskable',
           },
         ],
       },

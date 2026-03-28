@@ -45,7 +45,30 @@ export function useChatSessions() {
     await db.chatSessions.update(id, { mode });
   }
 
-  return { sessions, createSession, deleteSession, updateSessionTitle, toggleStar, updateSessionMode };
+  async function restoreSession(sessionData, messagesData = []) {
+    return await db.transaction('rw', db.chatSessions, db.messages, async () => {
+      const newId = await db.chatSessions.add({
+        title: sessionData.title,
+        updatedAt: sessionData.updatedAt,
+        starred: sessionData.starred,
+        mode: sessionData.mode,
+      });
+      
+      // Restore messages if any
+      for (const msg of messagesData) {
+        await db.messages.add({
+          sessionId: newId,
+          role: msg.role,
+          content: msg.content,
+          timestamp: msg.timestamp,
+        });
+      }
+      
+      return newId;
+    });
+  }
+
+  return { sessions, createSession, deleteSession, restoreSession, updateSessionTitle, toggleStar, updateSessionMode };
 }
 
 /**

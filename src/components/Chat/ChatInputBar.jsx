@@ -21,11 +21,11 @@ export default function ChatInputBar({ input, setInput, loading, onSend, inputRe
           onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && onSend()}
           placeholder={placeholder}
           className="chat-input"
-          disabled={loading}
+          // INSTANT: Input stays enabled even while AI thinks
         />
         <button
           onClick={onSend}
-          disabled={!input.trim() || loading}
+          disabled={!input.trim()}
           className="chat-send-btn"
           style={{ background: `var(--color-mode-${activeMode || 'all'})` }}
           aria-label="Send message"

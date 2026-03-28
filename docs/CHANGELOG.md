@@ -1,5 +1,57 @@
 # RamaDone Project Changelog
 
+## March 28, 2026 - UI Polish & UX Improvements
+
+### Overview
+Major visual and UX improvements: enhanced PWA icons, improved sidebar icon visibility, new expense view modes, session-persistent AI streaming, and better text contrast across all themes.
+
+### Changes
+
+#### PWA & Branding
+- **Neutral PWA Icon** - Changed from dynamic theme-based icons to a neutral black SVG icon that works consistently across all themes and platforms
+- **New icon path**: `public/icons/icon-app.svg` - Black background with white geometric design
+- Updated `manifest.json`, `vite.config.js`, and `index.html` to use the neutral icon
+
+#### Sidebar Improvements
+- **Vibrant icon colors** - Updated all 11 themes with more saturated `--c-mode-*` colors for better visibility
+- **Removed opacity fade** - Sidebar icons now display at full opacity (`opacity: 1`)
+- **Hover effects** - Added scale transform on hover (`transform: scale(1.1)`)
+- **Increased icon sizes** - Mode icons: 15px → 18px, Action icons (star/delete): 12px → 14px
+
+#### Expense Tracker - New View Modes
+- **Combined duplicate category sections** into single "Transactions" section
+- **3-tab navigation**:
+  - **Timeline** - Transactions grouped by date (original view)
+  - **By Category** - Transactions grouped by category with expandable sections
+  - **Chart** - Visual horizontal bar chart showing spending by category with percentages
+- Added summary cards in Chart view showing Income, Spent, and Balance
+
+#### AI Chat - Session Persistence Fix
+- **Fixed streaming interruption** when switching chat sessions
+- Added `sessionLoading` state map to track AI loading per session
+- AI continues processing in background even when user switches to another chat
+- Returning to a session shows correct loading state
+
+#### Accessibility & Contrast
+- **Improved text contrast** across all 11 themes
+- **Light themes**: Muted text colors darkened for better readability
+- **Dark themes**: Muted text colors lightened for better readability
+- Affects all secondary text, labels, meta information, and timestamps
+
+### Files Modified
+- `src/index.css` - Theme color updates, improved contrast
+- `src/components/Chat/ChatView.jsx` - Session-persistent loading state
+- `src/components/Chat/ChatSidebar.jsx` - Larger icon sizes
+- `src/components/Expenses/ExpensesView.jsx` - Tabbed view modes
+- `src/styles/components/chat.css` - Icon styles, hover effects
+- `src/styles/components/expenses.css` - Chart styles, tab styles
+- `public/icons/icon-app.svg` - New neutral PWA icon
+- `public/manifest.json` - Updated icon references
+- `vite.config.js` - Updated PWA manifest
+- `index.html` - Updated apple-touch-icon
+
+---
+
 **Date:** March 26, 2026
 **Commit:** Production Release - Firebase Integration & Admin Dashboard
 

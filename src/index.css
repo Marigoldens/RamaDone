@@ -72,246 +72,300 @@
 }
 
 /* ==========================================
-   DEFAULT THEME — Warm Cream / Light
+   PAPER WHITE — Clean Minimal Light (Default)
    ========================================== */
 :root {
-  --c-primary: #1e3a5f;
-  --c-primary-light: #2d5a8e;
-  --c-surface: #fdf6ec;
-  --c-surface-elevated: #ffffff;
-  --c-text: #1a1a2e;
-  --c-text-muted: #6b7280;
-  --c-accent: #c9a84c;
-  --c-accent-glow: rgba(201, 168, 76, 0.3);
-  --c-prayer: #1e3a5f;
-  --c-prayer-text: #e8dcc8;
-  --c-iftar: #c9a84c;
-  --c-iftar-text: #1a1a2e;
-  --c-border: #e5ddd0;
-  --c-nav-bg: #ffffff;
-  /* Chat mode accent colors — light-friendly */
-  --c-mode-all: #c9a84c;
-  --c-mode-calendar: #4f46e5;
-  --c-mode-tasks: #d97706;
-  --c-mode-expenses: #059669;
-  --c-mode-habits: #db2777;
-  --c-mode-gym: #dc2626;
-}
-
-/* ==========================================
-   DARK THEME — Deep Navy
-   ========================================== */
-.theme-dark {
-  --c-primary: #60a5fa;
-  --c-primary-light: #93c5fd;
-  --c-surface: #0f172a;
-  --c-surface-elevated: #1e293b;
-  --c-text: #f1f5f9;
-  --c-text-muted: #94a3b8;
-  --c-accent: #f59e0b;
-  --c-accent-glow: rgba(245, 158, 11, 0.25);
-  --c-prayer: #1e3a5f;
-  --c-prayer-text: #93c5fd;
+  --c-primary: #2563eb;
+  --c-primary-light: #3b82f6;
+  --c-surface: #ffffff;
+  --c-surface-elevated: #f8fafc;
+  --c-text: #0f172a;
+  --c-text-muted: #475569;
+  --c-accent: #2563eb;
+  --c-accent-glow: rgba(37, 99, 235, 0.15);
+  --c-prayer: #1e40af;
+  --c-prayer-text: #dbeafe;
   --c-iftar: #f59e0b;
   --c-iftar-text: #0f172a;
-  --c-border: #334155;
-  --c-nav-bg: #1e293b;
-  /* Chat mode accent colors — dark-friendly */
-  --c-mode-all: #f59e0b;
-  --c-mode-calendar: #818cf8;
-  --c-mode-tasks: #fbbf24;
-  --c-mode-expenses: #34d399;
-  --c-mode-habits: #f472b6;
-  --c-mode-gym: #f87171;
-}
-
-/* ==========================================
-   DESERT THEME — Sand & Gold
-   ========================================== */
-.theme-desert {
-  --c-primary: #92400e;
-  --c-primary-light: #b45309;
-  --c-surface: #fef3c7;
-  --c-surface-elevated: #fffbeb;
-  --c-text: #451a03;
-  --c-text-muted: #78716c;
-  --c-accent: #d97706;
-  --c-accent-glow: rgba(217, 119, 6, 0.3);
-  --c-prayer: #78350f;
-  --c-prayer-text: #fef3c7;
-  --c-iftar: #d97706;
-  --c-iftar-text: #451a03;
-  --c-border: #d6d3d1;
-  --c-nav-bg: #fffbeb;
-  /* Chat mode accent colors — desert-friendly */
-  --c-mode-all: #d97706;
-  --c-mode-calendar: #7c3aed;
-  --c-mode-tasks: #b45309;
-  --c-mode-expenses: #047857;
-  --c-mode-habits: #be185d;
-  --c-mode-gym: #b91c1c;
-}
-
-/* ==========================================
-   OCEAN THEME — Cool Blues & Teals
-   ========================================== */
-.theme-ocean {
-  --c-primary: #0369a1;
-  --c-primary-light: #0284c7;
-  --c-surface: #f0f9ff;
-  --c-surface-elevated: #ffffff;
-  --c-text: #0c4a6e;
-  --c-text-muted: #64748b;
-  --c-accent: #0891b2;
-  --c-accent-glow: rgba(8, 145, 178, 0.3);
-  --c-prayer: #164e63;
-  --c-prayer-text: #cffafe;
-  --c-iftar: #06b6d4;
-  --c-iftar-text: #0c4a6e;
-  --c-border: #bae6fd;
+  --c-border: #e2e8f0;
   --c-nav-bg: #ffffff;
-  /* Chat mode accent colors — ocean-friendly */
-  --c-mode-all: #0891b2;
-  --c-mode-calendar: #6366f1;
-  --c-mode-tasks: #0284c7;
-  --c-mode-expenses: #059669;
-  --c-mode-habits: #db2777;
-  --c-mode-gym: #dc2626;
-}
-
-/* ==========================================
-   FOREST THEME — Natural Greens
-   ========================================== */
-.theme-forest {
-  --c-primary: #166534;
-  --c-primary-light: #15803d;
-  --c-surface: #f0fdf4;
-  --c-surface-elevated: #ffffff;
-  --c-text: #14532d;
-  --c-text-muted: #6b7280;
-  --c-accent: #22c55e;
-  --c-accent-glow: rgba(34, 197, 94, 0.3);
-  --c-prayer: #166534;
-  --c-prayer-text: #dcfce7;
-  --c-iftar: #84cc16;
-  --c-iftar-text: #14532d;
-  --c-border: #bbf7d0;
-  --c-nav-bg: #ffffff;
-  /* Chat mode accent colors — forest-friendly */
-  --c-mode-all: #22c55e;
-  --c-mode-calendar: #4f46e5;
-  --c-mode-tasks: #ca8a04;
-  --c-mode-expenses: #0d9488;
-  --c-mode-habits: #db2777;
-  --c-mode-gym: #dc2626;
-}
-
-/* ==========================================
-   ROSE THEME — Soft Pinks & Romantic
-   ========================================== */
-.theme-rose {
-  --c-primary: #9f1239;
-  --c-primary-light: #be123c;
-  --c-surface: #fff1f2;
-  --c-surface-elevated: #ffffff;
-  --c-text: #4c0519;
-  --c-text-muted: #78716c;
-  --c-accent: #e11d48;
-  --c-accent-glow: rgba(225, 29, 72, 0.3);
-  --c-prayer: #881337;
-  --c-prayer-text: #ffe4e6;
-  --c-iftar: #f43f5e;
-  --c-iftar-text: #4c0519;
-  --c-border: #fecdd3;
-  --c-nav-bg: #ffffff;
-  /* Chat mode accent colors — rose-friendly */
-  --c-mode-all: #e11d48;
-  --c-mode-calendar: #7c3aed;
-  --c-mode-tasks: #f59e0b;
-  --c-mode-expenses: #059669;
-  --c-mode-habits: #db2777;
-  --c-mode-gym: #dc2626;
-}
-
-/* ==========================================
-   MIDNIGHT THEME — Deep Purple Dark Mode
-   ========================================== */
-.theme-midnight {
-  --c-primary: #a855f7;
-  --c-primary-light: #c084fc;
-  --c-surface: #0f0a1a;
-  --c-surface-elevated: #1a1025;
-  --c-text: #f3e8ff;
-  --c-text-muted: #a1a1aa;
-  --c-accent: #a855f7;
-  --c-accent-glow: rgba(168, 85, 247, 0.3);
-  --c-prayer: #581c87;
-  --c-prayer-text: #e9d5ff;
-  --c-iftar: #c084fc;
-  --c-iftar-text: #0f0a1a;
-  --c-border: #3b0764;
-  --c-nav-bg: #1a1025;
-  /* Chat mode accent colors — midnight-friendly */
-  --c-mode-all: #a855f7;
-  --c-mode-calendar: #818cf8;
-  --c-mode-tasks: #fbbf24;
-  --c-mode-expenses: #34d399;
-  --c-mode-habits: #f472b6;
-  --c-mode-gym: #f87171;
-}
-
-/* ==========================================
-   ARCTIC THEME — Icy Blues & Crisp Whites
-   ========================================== */
-.theme-arctic {
-  --c-primary: #0ea5e9;
-  --c-primary-light: #38bdf8;
-  --c-surface: #f8fafc;
-  --c-surface-elevated: #ffffff;
-  --c-text: #0f172a;
-  --c-text-muted: #64748b;
-  --c-accent: #0ea5e9;
-  --c-accent-glow: rgba(14, 165, 233, 0.25);
-  --c-prayer: #0c4a6e;
-  --c-prayer-text: #e0f2fe;
-  --c-iftar: #06b6d4;
-  --c-iftar-text: #0f172a;
-  --c-border: #cbd5e1;
-  --c-nav-bg: #ffffff;
-  /* Chat mode accent colors — arctic-friendly */
-  --c-mode-all: #0ea5e9;
-  --c-mode-calendar: #6366f1;
-  --c-mode-tasks: #f59e0b;
+  /* Chat mode accent colors - vibrant */
+  --c-mode-all: #3b82f6;
+  --c-mode-calendar: #8b5cf6;
+  --c-mode-tasks: #f97316;
   --c-mode-expenses: #10b981;
   --c-mode-habits: #ec4899;
   --c-mode-gym: #ef4444;
 }
 
 /* ==========================================
-   SUNSET THEME — Warm Oranges & Coral
+   LATTE — Warm Coffee Light
    ========================================== */
-.theme-sunset {
-  --c-primary: #ea580c;
-  --c-primary-light: #f97316;
-  --c-surface: #fff7ed;
+.theme-latte {
+  --c-primary: #8839ef;
+  --c-primary-light: #9c6dff;
+  --c-surface: #eff1f5;
   --c-surface-elevated: #ffffff;
-  --c-text: #431407;
-  --c-text-muted: #78716c;
-  --c-accent: #f97316;
-  --c-accent-glow: rgba(249, 115, 22, 0.3);
-  --c-prayer: #9a3412;
-  --c-prayer-text: #ffedd5;
-  --c-iftar: #fb923c;
-  --c-iftar-text: #431407;
-  --c-border: #fed7aa;
+  --c-text: #4c4f69;
+  --c-text-muted: #6c6f85;
+  --c-accent: #fe640b;
+  --c-accent-glow: rgba(254, 100, 11, 0.2);
+  --c-prayer: #d20f39;
+  --c-prayer-text: #eff1f5;
+  --c-iftar: #df8e1d;
+  --c-iftar-text: #4c4f69;
+  --c-border: #ccd0da;
   --c-nav-bg: #ffffff;
-  /* Chat mode accent colors — sunset-friendly */
-  --c-mode-all: #f97316;
-  --c-mode-calendar: #8b5cf6;
-  --c-mode-tasks: #ca8a04;
-  --c-mode-expenses: #059669;
-  --c-mode-habits: #db2777;
-  --c-mode-gym: #dc2626;
+  /* Chat mode accent colors - vibrant */
+  --c-mode-all: #9d4edd;
+  --c-mode-calendar: #7c3aed;
+  --c-mode-tasks: #f59e0b;
+  --c-mode-expenses: #22c55e;
+  --c-mode-habits: #f472b6;
+  --c-mode-gym: #e11d48;
+}
+
+/* ==========================================
+   DAWN — Soft Peachy Morning Light
+   ========================================== */
+.theme-dawn {
+  --c-primary: #e64553;
+  --c-primary-light: #f27983;
+  --c-surface: #faf4ed;
+  --c-surface-elevated: #fffaf3;
+  --c-text: #575279;
+  --c-text-muted: #79748a;
+  --c-accent: #ea9d34;
+  --c-accent-glow: rgba(234, 157, 52, 0.2);
+  --c-prayer: #b4637a;
+  --c-prayer-text: #faf4ed;
+  --c-iftar: #ea9d34;
+  --c-iftar-text: #575279;
+  --c-border: #f2e9e1;
+  --c-nav-bg: #fffaf3;
+  /* Chat mode accent colors - vibrant */
+  --c-mode-all: #f43f5e;
+  --c-mode-calendar: #a78bfa;
+  --c-mode-tasks: #fbbf24;
+  --c-mode-expenses: #14b8a6;
+  --c-mode-habits: #ec4899;
+  --c-mode-gym: #f87171;
+}
+
+/* ==========================================
+   MINT FRESH — Light Refreshing Green
+   ========================================== */
+.theme-mint {
+  --c-primary: #0d9488;
+  --c-primary-light: #14b8a6;
+  --c-surface: #f0fdfa;
+  --c-surface-elevated: #ffffff;
+  --c-text: #134e4a;
+  --c-text-muted: #0f766e;
+  --c-accent: #0d9488;
+  --c-accent-glow: rgba(13, 148, 136, 0.2);
+  --c-prayer: #115e59;
+  --c-prayer-text: #ccfbf1;
+  --c-iftar: #f59e0b;
+  --c-iftar-text: #134e4a;
+  --c-border: #99f6e4;
+  --c-nav-bg: #ffffff;
+  /* Chat mode accent colors - vibrant */
+  --c-mode-all: #14b8a6;
+  --c-mode-calendar: #818cf8;
+  --c-mode-tasks: #fbbf24;
+  --c-mode-expenses: #22c55e;
+  --c-mode-habits: #f472b6;
+  --c-mode-gym: #f87171;
+}
+
+/* ==========================================
+   LAVENDER — Soft Purple Light
+   ========================================== */
+.theme-lavender {
+  --c-primary: #7c3aed;
+  --c-primary-light: #8b5cf6;
+  --c-surface: #faf5ff;
+  --c-surface-elevated: #ffffff;
+  --c-text: #3b0764;
+  --c-text-muted: #6b21a8;
+  --c-accent: #a855f7;
+  --c-accent-glow: rgba(168, 85, 247, 0.2);
+  --c-prayer: #6b21a8;
+  --c-prayer-text: #f3e8ff;
+  --c-iftar: #c084fc;
+  --c-iftar-text: #3b0764;
+  --c-border: #e9d5ff;
+  --c-nav-bg: #ffffff;
+  /* Chat mode accent colors - vibrant */
+  --c-mode-all: #8b5cf6;
+  --c-mode-calendar: #6366f1;
+  --c-mode-tasks: #fbbf24;
+  --c-mode-expenses: #10b981;
+  --c-mode-habits: #f472b6;
+  --c-mode-gym: #f87171;
+}
+
+/* ==========================================
+   OBSIDIAN — True Black OLED Dark
+   ========================================== */
+.theme-obsidian {
+  --c-primary: #60a5fa;
+  --c-primary-light: #93c5fd;
+  --c-surface: #000000;
+  --c-surface-elevated: #0a0a0a;
+  --c-text: #f5f5f5;
+  --c-text-muted: #a3a3a3;
+  --c-accent: #60a5fa;
+  --c-accent-glow: rgba(96, 165, 250, 0.15);
+  --c-prayer: #2563eb;
+  --c-prayer-text: #dbeafe;
+  --c-iftar: #fbbf24;
+  --c-iftar-text: #000000;
+  --c-border: #262626;
+  --c-nav-bg: #0a0a0a;
+  /* Chat mode accent colors - vibrant */
+  --c-mode-all: #3b82f6;
+  --c-mode-calendar: #a78bfa;
+  --c-mode-tasks: #fcd34d;
+  --c-mode-expenses: #34d399;
+  --c-mode-habits: #fb7185;
+  --c-mode-gym: #f87171;
+}
+
+/* ==========================================
+   NORD — Arctic Bluish Dark
+   ========================================== */
+.theme-nord {
+  --c-primary: #88c0d0;
+  --c-primary-light: #8fbcbb;
+  --c-surface: #2e3440;
+  --c-surface-elevated: #3b4252;
+  --c-text: #eceff4;
+  --c-text-muted: #b8c0d0;
+  --c-accent: #88c0d0;
+  --c-accent-glow: rgba(136, 192, 208, 0.2);
+  --c-prayer: #5e81ac;
+  --c-prayer-text: #eceff4;
+  --c-iftar: #ebcb8b;
+  --c-iftar-text: #2e3440;
+  --c-border: #4c566a;
+  --c-nav-bg: #3b4252;
+  /* Chat mode accent colors - vibrant */
+  --c-mode-all: #63b3ed;
+  --c-mode-calendar: #94a3c8;
+  --c-mode-tasks: #f6c177;
+  --c-mode-expenses: #a3be8c;
+  --c-mode-habits: #d5a6bd;
+  --c-mode-gym: #e78f8f;
+}
+
+/* ==========================================
+   TOKYO NIGHT — Purple/Blue Dark
+   ========================================== */
+.theme-tokyo {
+  --c-primary: #7aa2f7;
+  --c-primary-light: #a9b1d6;
+  --c-surface: #1a1b26;
+  --c-surface-elevated: #24283b;
+  --c-text: #c0caf5;
+  --c-text-muted: #9aa5d9;
+  --c-accent: #7aa2f7;
+  --c-accent-glow: rgba(122, 162, 247, 0.2);
+  --c-prayer: #bb9af7;
+  --c-prayer-text: #1a1b26;
+  --c-iftar: #e0af68;
+  --c-iftar-text: #1a1b26;
+  --c-border: #414868;
+  --c-nav-bg: #24283b;
+  /* Chat mode accent colors - vibrant */
+  --c-mode-all: #7dcfff;
+  --c-mode-calendar: #c0a0ff;
+  --c-mode-tasks: #ffc777;
+  --c-mode-expenses: #9ece6a;
+  --c-mode-habits: #ff9ece;
+  --c-mode-gym: #ff8b97;
+}
+
+/* ==========================================
+   DRACULA — Iconic Purple/Green Dark
+   ========================================== */
+.theme-dracula {
+  --c-primary: #bd93f9;
+  --c-primary-light: #cba6f7;
+  --c-surface: #282a36;
+  --c-surface-elevated: #44475a;
+  --c-text: #f8f8f2;
+  --c-text-muted: #a8b2d1;
+  --c-accent: #ff79c6;
+  --c-accent-glow: rgba(255, 121, 198, 0.2);
+  --c-prayer: #6272a4;
+  --c-prayer-text: #f8f8f2;
+  --c-iftar: #f1fa8c;
+  --c-iftar-text: #282a36;
+  --c-border: #44475a;
+  --c-nav-bg: #44475a;
+  /* Chat mode accent colors - vibrant */
+  --c-mode-all: #d19cff;
+  --c-mode-calendar: #a5ffff;
+  --c-mode-tasks: #ffffa5;
+  --c-mode-expenses: #69ffa0;
+  --c-mode-habits: #ff99d6;
+  --c-mode-gym: #ff7777;
+}
+
+/* ==========================================
+   GRUVBOX — Retro Warm Dark
+   ========================================== */
+.theme-gruvbox {
+  --c-primary: #d79921;
+  --c-primary-light: #fabd2f;
+  --c-surface: #282828;
+  --c-surface-elevated: #3c3836;
+  --c-text: #ebdbb2;
+  --c-text-muted: #b5a89a;
+  --c-accent: #fe8019;
+  --c-accent-glow: rgba(254, 128, 25, 0.2);
+  --c-prayer: #458588;
+  --c-prayer-text: #ebdbb2;
+  --c-iftar: #d79921;
+  --c-iftar-text: #282828;
+  --c-border: #504945;
+  --c-nav-bg: #3c3836;
+  /* Chat mode accent colors - vibrant */
+  --c-mode-all: #fabd2f;
+  --c-mode-calendar: #93a89a;
+  --c-mode-tasks: #fe9f38;
+  --c-mode-expenses: #c8d44a;
+  --c-mode-habits: #e589a8;
+  --c-mode-gym: #fb6950;
+}
+
+/* ==========================================
+   BLADE — Bold Red & Indigo Dark
+   ========================================== */
+.theme-blade {
+  --c-primary: #6366f1;
+  --c-primary-light: #818cf8;
+  --c-surface: #0f0a14;
+  --c-surface-elevated: #1a1420;
+  --c-text: #f5f5f5;
+  --c-text-muted: #c4c4c9;
+  --c-accent: #dc2626;
+  --c-accent-glow: rgba(220, 38, 38, 0.25);
+  --c-prayer: #4f46e5;
+  --c-prayer-text: #e0e7ff;
+  --c-iftar: #dc2626;
+  --c-iftar-text: #0f0a14;
+  --c-border: #2e2836;
+  --c-nav-bg: #1a1420;
+  /* Chat mode accent colors - vibrant */
+  --c-mode-all: #f43f5e;
+  --c-mode-calendar: #818cf8;
+  --c-mode-tasks: #fb923c;
+  --c-mode-expenses: #34d399;
+  --c-mode-habits: #f472b6;
+  --c-mode-gym: #f87171;
 }
 
 /* ==========================================

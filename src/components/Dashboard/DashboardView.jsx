@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { usePreferences } from '../../hooks/usePreferences';
 import { useGlobalApp } from '../../context/GlobalAppContext';
+import { formatTime } from '../../utils/timeHelpers';
 
 const STORAGE_KEY = 'ramadone_dashboard_widgets';
 const DEFAULT_VIS = { tasks: true, expenses: true, habits: true, calendar: true, gym: true, prayers: true };
@@ -62,11 +63,17 @@ export default function DashboardView({ onNavigate }) {
     workoutPlans,
   } = globalApp;
 
-  // Compute next event
-  const nextEvent = useMemo(
-    () => eventsToday.sort((a, b) => (a.start || '').localeCompare(b.start || ''))[0],
-    [eventsToday]
-  );
+  // Compute next event with formatted time
+  const nextEvent = useMemo(() => {
+    const sorted = eventsToday.sort((a, b) => (a.start || '').localeCompare(b.start || ''))[0];
+    if (!sorted) return null;
+    
+    // Format time nicely based on user preference
+    const timeFormat = getPref('timeFormat') || '12h';
+    const formattedTime = sorted.start ? formatTime(sorted.start, timeFormat) : null;
+    
+    return { ...sorted, formattedTime };
+  }, [eventsToday, getPref]);
 
   // Compute next prayer
   const nextPrayer = useMemo(() => {
@@ -314,9 +321,12 @@ export default function DashboardView({ onNavigate }) {
             </div>
             {nextEvent && (
               <div className="dashboard-widget__footer">
-                <span className="text-[11px] text-text-muted">
-                  Next: <strong className="text-text font-semibold">{nextEvent.title}</strong>
-                  {nextEvent.start && <span className="ml-1 text-accent font-mono text-[10px]">{nextEvent.start}</span>}
+                <div className="flex items-center gap-2">
+                  <Clock className="w-3 h-3 text-accent" />
+                  <span className="text-[11px] font-semibold text-accent">{nextEvent.formattedTime}</span>
+                </div>
+                <span className="text-[11px] text-text-muted mt-1 block">
+                  <strong className="text-text font-semibold">{nextEvent.title}</strong>
                 </span>
               </div>
             )}

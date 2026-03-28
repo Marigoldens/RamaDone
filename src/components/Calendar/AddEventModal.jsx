@@ -56,94 +56,66 @@ export default function AddEventModal({ date, prefilledTime, onClose, onAdd, acc
   };
 
   return (
-    <div className="fixed inset-0 z-50 animate-fade-in">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-
-      {/* Bottom sheet */}
-      <div
-        className="absolute bottom-0 left-0 right-0 bg-surface-elevated rounded-t-3xl p-6 pb-8
-                   border-t border-border shadow-2xl animate-fade-in-up modal-sheet"
-      >
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={e => e.stopPropagation()}>
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-text">New Event</h2>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl hover:bg-surface transition-colors cursor-pointer"
+            className="p-1 rounded-lg hover:bg-surface-elevated transition-colors"
           >
             <X className="w-5 h-5 text-text-muted" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           {/* Title */}
           <div>
-            <label className="block text-sm font-medium text-text-muted mb-1.5">
-              Event Name
-            </label>
+            <label className="text-xs font-semibold text-text-muted mb-1 block">Event Name</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g., Quran Study, Workout..."
-              className="w-full px-4 py-3 rounded-xl bg-surface border border-border
-                         text-text placeholder-text-muted/50 text-sm
-                         focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent
-                         transition-all"
+              className="modal-input modal-input--lg"
               autoFocus
             />
           </div>
 
           {/* Type Dropdown */}
           <div>
-            <label className="block text-sm font-medium text-text-muted mb-1.5">
-              Category
-            </label>
-            <div className="relative">
-              <select
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-surface border border-border
-                           text-text text-sm appearance-none
-                           focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent
-                           transition-all"
-              >
-                <option value="custom">Custom</option>
-                <option value="prayer">Prayer</option>
-                <option value="iftar">Iftar</option>
-                <option value="suhoor">Suhoor</option>
-              </select>
-              <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none">
-                <svg className="w-4 h-4 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-            </div>
+            <label className="text-xs font-semibold text-text-muted mb-1 block">Category</label>
+            <select
+              value={type}
+              onChange={(e) => setType(e.target.value)}
+              className="modal-input text-sm"
+            >
+              <option value="custom">Custom</option>
+              <option value="prayer">Prayer</option>
+              <option value="iftar">Iftar</option>
+              <option value="suhoor">Suhoor</option>
+            </select>
           </div>
 
           {/* Time inputs */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-text-muted mb-1.5">Start</label>
+              <label className="text-xs font-semibold text-text-muted mb-1 block">Start</label>
               <input
                 type="time"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-surface border border-border
-                           text-text text-sm focus:outline-none focus:ring-2
-                           focus:ring-accent/50 focus:border-accent transition-all"
+                className="modal-input text-sm"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-text-muted mb-1.5">End</label>
+              <label className="text-xs font-semibold text-text-muted mb-1 block">End</label>
               <input
                 type="time"
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-surface border border-border
-                           text-text text-sm focus:outline-none focus:ring-2
-                           focus:ring-accent/50 focus:border-accent transition-all"
+                className="modal-input text-sm"
               />
             </div>
           </div>
@@ -152,11 +124,11 @@ export default function AddEventModal({ date, prefilledTime, onClose, onAdd, acc
           <button
             type="submit"
             disabled={saving || !title.trim()}
-            className="w-full py-3.5 rounded-xl font-semibold text-sm
+            className="w-full py-4 rounded-xl font-bold text-base
                        transition-all duration-200 cursor-pointer
                        hover:scale-[1.01] active:scale-[0.99]
                        disabled:opacity-50 disabled:cursor-not-allowed
-                       btn-gradient-accent"
+                       btn-gradient-accent mt-2"
           >
             {saving ? 'Adding...' : 'Add Event'}
           </button>

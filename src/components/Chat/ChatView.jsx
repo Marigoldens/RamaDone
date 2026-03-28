@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Menu } from 'lucide-react';
 import { format } from 'date-fns';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -29,8 +29,47 @@ export default function ChatView({ user, accessToken }) {
   // ── Chat mode state ── ('all' → auto-detect; explicit → scoped)
   const [chatMode, setChatMode] = useState('all');
 
+  // ── Optimistic updates ──
+  const [optimisticMessages, setOptimisticMessages] = useState([]);
+  const [optimisticSession, setOptimisticSession] = useState(null);
+
   const { sessions, createSession, updateSessionMode } = useChatSessions();
-  const { messages, sendMessage, updateMessageData } = useMessages(activeSessionId);
+  const { messages: dbMessages, sendMessage, updateMessageData } = useMessages(activeSessionId);
+  
+  // Merge optimistic messages with DB messages for instant UI
+  const messages = useMemo(() => {
+    if (!activeSessionId) return [];
+    const merged = [...dbMessages];
+    optimisticMessages.forEach(om => {
+      // Only add if no message with same content AND role exists (within 5 second window)
+      const isDuplicate = merged.some(m => 
+        m.role === om.role && 
+        m.content === om.content && 
+        Math.abs(m.timestamp - om.timestamp) < 5000
+      );
+      if (!isDuplicate) {
+        merged.push(om);
+      }
+    });
+    return merged.sort((a, b) => a.timestamp - b.timestamp);
+  }, [dbMessages, optimisticMessages, activeSessionId]);
+  
+  // Clear optimistic messages once DB catches up
+  useEffect(() => {
+    if (optimisticMessages.length === 0) return;
+    // Match by content AND role within 5 second window (not exact timestamp)
+    const synced = optimisticMessages.filter(om => {
+      const hasDbMatch = dbMessages.some(m => 
+        m.role === om.role && 
+        m.content === om.content && 
+        Math.abs(m.timestamp - om.timestamp) < 5000
+      );
+      return !hasDbMatch;
+    });
+    if (synced.length !== optimisticMessages.length) {
+      setOptimisticMessages(synced);
+    }
+  }, [dbMessages, optimisticMessages]);
   const { refreshAll } = useGlobalApp();
 
   const todayDate = format(new Date(), 'yyyy-MM-dd');
@@ -86,8 +125,27 @@ export default function ChatView({ user, accessToken }) {
   // ── UI state ──
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [sessionLoading, setSessionLoading] = useState({}); // Track loading per session
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [pendingConfirmations, setPendingConfirmations] = useState([]); // Track pending actions for instant UI
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
+  const prevShowEmptyState = useRef(null);
+  
+  // Derive current session's loading state from session-specific map
+  const isCurrentSessionLoading = activeSessionId ? sessionLoading[activeSessionId] || false : false;
+  
+  // Reset loading state when switching sessions - each session is isolated
+  // NOTE: Don't clear optimisticMessages here - they're session-specific and handled separately
+  useEffect(() => {
+    // Don't reset loading if we're currently sending (prevents killing the thinking indicator
+    // when the session ID changes from temp to real during message send)
+    if (!isSendingRef.current) {
+      setLoading(false);
+    }
+    setInput('');
+    setPendingConfirmations([]);
+  }, [activeSessionId]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -105,8 +163,47 @@ export default function ChatView({ user, accessToken }) {
     }
   };
 
-  // ── Confirm tasks / expenses / habits ──
+  // ── INSTANT: Confirm productivity actions with optimistic updates ──
   const handleConfirmProductivity = async (messageId, pendingActions) => {
+    // ── INSTANT: Update UI immediately ──
+    const optimisticUpdates = [];
+    const timestamp = Date.now();
+    
+    for (const action of pendingActions) {
+      if (action.tool === 'add_task') {
+        optimisticUpdates.push({
+          type: 'task',
+          tempId: `temp-task-${timestamp}`,
+          data: { id: `temp-task-${timestamp}`, title: action.args.title, priority: action.args.priority || 'medium', dueDate: action.args.dueDate, category: action.args.category, notes: action.args.notes, status: action.args.status || 'todo', createdAt: timestamp, updatedAt: timestamp }
+        });
+      } else if (action.tool === 'add_expense') {
+        optimisticUpdates.push({
+          type: 'expense',
+          tempId: `temp-expense-${timestamp}`,
+          data: { id: `temp-expense-${timestamp}`, amount: parseFloat(action.args.amount) || 0, type: action.args.type || 'expense', category: (action.args.category || 'other').toLowerCase(), date: action.args.date || todayDate, note: action.args.note || null, createdAt: timestamp }
+        });
+      } else if (action.tool === 'add_habit') {
+        optimisticUpdates.push({
+          type: 'habit',
+          tempId: `temp-habit-${timestamp}`,
+          data: { id: `temp-habit-${timestamp}`, name: action.args.name, emoji: action.args.emoji || '🎯', category: action.args.category?.toLowerCase() || null, frequency: action.args.frequency || 'daily', archived: 0, createdAt: new Date().toISOString() }
+        });
+      } else if (action.tool === 'log_habit') {
+        optimisticUpdates.push({
+          type: 'habitLog',
+          tempId: `temp-log-${timestamp}`,
+          data: { id: `temp-log-${timestamp}`, habitId: action.args.habitId, date: action.args.date, completed: action.args.completed, count: 1, note: '' }
+        });
+      }
+    }
+    
+    // Apply optimistic updates to global context immediately
+    if (optimisticUpdates.length > 0) {
+      setPendingConfirmations(prev => [...prev, ...optimisticUpdates]);
+      refreshAll?.(); // Instant dashboard update
+    }
+    
+    // ── BACKGROUND: Persist to DB (non-blocking) ──
     try {
       for (const action of pendingActions) {
         if (action.tool === 'add_task') {
@@ -230,21 +327,167 @@ export default function ChatView({ user, accessToken }) {
         }
       }
       await updateMessageData(messageId, { isConfirmed: true });
+      // Clear optimistic updates once DB is synced
+      setPendingConfirmations(prev => prev.filter(u => !optimisticUpdates.find(o => o.tempId === u.tempId)));
       // Refresh global cache so Dashboard and other views update immediately
       refreshAll?.();
     } catch (err) {
       console.error('Failed to confirm productivity actions', err);
+      // Rollback optimistic updates on error
+      setPendingConfirmations(prev => prev.filter(u => !optimisticUpdates.find(o => o.tempId === u.tempId)));
     }
   };
 
   // ── Main send handler ──
-  const handleSend = async (messageText = input) => {
-    if (!messageText.trim() || loading) return;
-
-    const textToSubmit = messageText.trim();
+  // Use a ref-based guard that persists across ALL renders
+  const isSendingRef = useRef(false);
+  const lastMessageRef = useRef(null);
+  const lastSendTimeRef = useRef(0);
+  
+  // Wrap the actual send logic in a stable ref to avoid dependency issues
+  const sendLogicRef = useRef({
+    input,
+    activeSessionId,
+    chatMode,
+    messages,
+    allEvents,
+    preferences,
+    prayerTimes,
+    productivityData,
+    currentMode: chatMode,
+    user,
+    todayDate
+  });
+  
+  // Update the send logic ref whenever dependencies change
+  useEffect(() => {
+    sendLogicRef.current = {
+      input,
+      activeSessionId,
+      chatMode,
+      messages,
+      allEvents,
+      preferences,
+      prayerTimes,
+      productivityData,
+      currentMode: chatMode,
+      user,
+      todayDate
+    };
+  }, [input, activeSessionId, chatMode, messages, allEvents, preferences, prayerTimes, productivityData, user, todayDate]);
+  
+  const handleSend = useCallback(async (messageText) => {
+    // Get fresh state from ref first
+    const state = sendLogicRef.current;
+    const freshInput = state?.input || '';
+    
+    // Detailed logging to trace duplicates
+    console.log('[Chat] handleSend called:', { 
+      messageText, 
+      type: typeof messageText,
+      freshInput,
+      isSending: isSendingRef.current,
+      lastSendTime: lastSendTimeRef.current,
+      lastMessage: lastMessageRef.current,
+      timeSinceLastSend: Date.now() - lastSendTimeRef.current
+    });
+    
+    // Normalize input - handle both direct calls and event objects
+    const text = typeof messageText === 'string' ? messageText : freshInput;
+    if (!text?.trim()) {
+      console.log('[Chat] Blocked: Empty text');
+      return;
+    }
+    
+    const trimmedText = text.trim();
+    const now = Date.now();
+    
+    // Multiple layers of deduplication
+    if (isSendingRef.current) {
+      console.log('[Chat] Blocked: Already sending');
+      return;
+    }
+    
+    // Time-based deduplication (1 second window)
+    if (now - lastSendTimeRef.current < 1000) {
+      console.log('[Chat] Blocked: Too soon since last send');
+      return;
+    }
+    
+    // Content-based deduplication (same message in flight)
+    if (lastMessageRef.current === trimmedText) {
+      console.log('[Chat] Blocked: Same message already in flight');
+      return;
+    }
+    
+    console.log('[Chat] Sending message:', trimmedText);
+    
+    // Set guards immediately
+    isSendingRef.current = true;
+    lastSendTimeRef.current = now;
+    lastMessageRef.current = trimmedText;
+    
+    // Get current state from ref to avoid stale closures
+    if (!state) {
+      isSendingRef.current = false;
+      return;
+    }
+    
+    const { 
+      activeSessionId: stateSessionId, 
+      chatMode: stateChatMode,
+      messages: stateMessages,
+      allEvents: stateAllEvents,
+      preferences: statePreferences,
+      prayerTimes: statePrayerTimes,
+      productivityData: stateProductivityData,
+      currentMode: stateCurrentMode,
+      user: stateUser,
+      todayDate: stateTodayDate
+    } = state;
+    
+    const textToSubmit = trimmedText;
     setInput('');
-    setLoading(true);
     inputRef.current?.focus();
+
+    // ── INSTANT: Optimistic user message ──
+    const userMsgTimestamp = Date.now();
+    const optimisticUserMsg = {
+      id: `optimistic-${userMsgTimestamp}`,
+      role: 'user',
+      content: textToSubmit,
+      timestamp: userMsgTimestamp,
+      sessionId: activeSessionId,
+    };
+    setOptimisticMessages(prev => [...prev, optimisticUserMsg]);
+
+    // ── INSTANT: Optimistic session if needed ──
+    let sessionCreatedPromise = Promise.resolve(stateSessionId);
+    
+    if (!stateSessionId || typeof stateSessionId === 'string') {
+      const effectiveModeForNewSession = stateChatMode;
+      const title = textToSubmit.split(' ').slice(0, 4).join(' ') + '...';
+      const tempSessionId = `temp-${Date.now()}`;
+      setOptimisticSession({ id: tempSessionId, title, mode: effectiveModeForNewSession, updatedAt: Date.now() });
+      setActiveSessionId(tempSessionId);
+      
+      // Create real session and WAIT for it to complete
+      sessionCreatedPromise = createSession(title, effectiveModeForNewSession).then(realId => {
+        setActiveSessionId(realId);
+        setOptimisticSession(null);
+        // Re-assign optimistic messages to real session
+        setOptimisticMessages(prev => prev.map(m => ({ ...m, sessionId: realId })));
+        return realId; // Return the real ID for use later
+      });
+    }
+
+    // ── BACKGROUND: Write user message to DB ──
+    // Wait for session to be created before sending message
+    const finalSessionId = await sessionCreatedPromise;
+
+    // ── INSTANT: Show AI thinking indicator ──
+    setLoading(true);
+    setSessionLoading(prev => ({ ...prev, [finalSessionId]: true }));
 
     try {
       // Check API access before making AI request
@@ -258,34 +501,27 @@ export default function ChatView({ user, accessToken }) {
       }
 
       if (!hasAccess) {
-        await sendMessage('assistant', '⚠️ You do not have API access yet. Please contact the admin to grant you access to use AI features.', {}, activeSessionId || 'default');
-        setLoading(false);
+        // Remove optimistic message and show error
+        setOptimisticMessages(prev => prev.filter(m => m.timestamp !== userMsgTimestamp));
+        await sendMessage('assistant', '⚠️ You do not have API access yet. Please contact the admin to grant you access to use AI features.', {}, finalSessionId);
         return;
       }
 
-      let currentSessionId = activeSessionId;
-      if (!currentSessionId) {
-        // chatMode is the mode bar selection before any session exists
-        const effectiveModeForNewSession = chatMode;
-        const title = textToSubmit.split(' ').slice(0, 4).join(' ') + '...';
-        currentSessionId = await createSession(title, effectiveModeForNewSession);
-        setActiveSessionId(currentSessionId);
-      }
+      // Now persist user message with the real session ID
+      await sendMessage('user', textToSubmit, {}, finalSessionId);
 
-      await sendMessage('user', textToSubmit, {}, currentSessionId);
-
-      const currentMessages = [...(messages || []), { role: 'user', content: textToSubmit }];
+      const currentMessages = [...(stateMessages || []), { role: 'user', content: textToSubmit }];
       // Pass currentMode (session mode or bar selection) — aiService auto-detects domain when mode is 'all'
-      let aiResponse = await chatWithAI(currentMessages, allEvents, preferences, injectPrayerContext ? prayerTimes : null, productivityData, currentMode);
+      let aiResponse = await chatWithAI(currentMessages, stateAllEvents, statePreferences, statePrayerTimes ? statePrayerTimes : null, stateProductivityData, stateCurrentMode);
 
       // ── Auto-categorize session based on detected domain ──────────────────
       // Only fires when the user is in 'all' (auto) mode — if they explicitly
       // picked a mode (chatMode !== 'all') we NEVER override their choice.
-      const userPickedMode = chatMode !== 'all';
-      if (!userPickedMode && aiResponse.effectiveMode && aiResponse.effectiveMode !== 'all') {
-        const sess = sessions?.find(s => s.id === currentSessionId);
+      const userPickedMode = stateChatMode !== 'all';
+      if (!userPickedMode && aiResponse.effectiveMode && aiResponse.effectiveMode !== 'all' && typeof finalSessionId === 'number') {
+        const sess = sessions?.find(s => s.id === finalSessionId);
         if (!sess?.mode || sess.mode === 'all') {
-          await updateSessionMode(currentSessionId, aiResponse.effectiveMode);
+          await updateSessionMode(finalSessionId, aiResponse.effectiveMode);
         }
       }
 
@@ -311,8 +547,8 @@ export default function ChatView({ user, accessToken }) {
 
         // Helper to build a display label for a productivity action
         const mkProductivity = (call) => {
-          const t = tasks?.find(x => x.id === call.args.id);
-          const h = habits?.find(x => x.id === call.args.habitId);
+          const t = stateProductivityData.tasks?.find(x => x.id === call.args.id);
+          const h = stateProductivityData.habits?.find(x => x.id === call.args.habitId);
           // Sanitize args to remove any non-serializable values
           const sanitize = (obj) => {
             if (!obj || typeof obj !== 'object') return obj;
@@ -339,7 +575,7 @@ export default function ChatView({ user, accessToken }) {
             case 'add_task': return { tool: call.name, args: cleanArgs, display: `Add task: "${cleanArgs.title}"`, sub: `Priority: ${cleanArgs.priority || 'medium'}${cleanArgs.dueDate ? ` · Due ${cleanArgs.dueDate}` : ''}` };
             case 'update_task': return { tool: call.name, args: cleanArgs, display: `Update task: "${t?.title || `#${cleanArgs.id}`}"`, sub: JSON.stringify(cleanArgs.updates) };
             case 'delete_task': return { tool: call.name, args: cleanArgs, display: `Delete task: "${t?.title || `#${cleanArgs.id}`}"`, sub: 'Cannot be undone', danger: true };
-            case 'add_expense': return { tool: call.name, args: cleanArgs, display: `Log ${cleanArgs.type}: ${cleanArgs.amount} · ${cleanArgs.category}`, sub: cleanArgs.note || cleanArgs.date || todayDate };
+            case 'add_expense': return { tool: call.name, args: cleanArgs, display: `Log ${cleanArgs.type}: ${cleanArgs.amount} · ${cleanArgs.category}`, sub: cleanArgs.note || cleanArgs.date || stateTodayDate };
             case 'update_expense': return { tool: call.name, args: cleanArgs, display: `Edit expense #${cleanArgs.id}`, sub: Object.entries(cleanArgs.updates || {}).map(([k, v]) => `${k}: ${v}`).join(', ') };
             case 'delete_expense': return { tool: call.name, args: cleanArgs, display: `Delete entry #${cleanArgs.id}`, sub: 'Expense entry', danger: true };
             case 'add_habit': return { tool: call.name, args: cleanArgs, display: `Add habit: "${cleanArgs.name}"`, sub: `${cleanArgs.emoji || '🎯'} · ${cleanArgs.frequency || 'daily'}${cleanArgs.category ? ` · ${cleanArgs.category}` : ''}` };
@@ -359,20 +595,20 @@ export default function ChatView({ user, accessToken }) {
           if (call.name === 'add_event') {
             pushAddEvent(call.args);
           } else if (call.name === 'repeat_event') {
-            const result = await executeQueryTool(call, allEvents);
+            const result = await executeQueryTool(call, stateAllEvents);
             if (result.requiresBatch && result.events?.length > 0) {
               result.events.forEach(ev => pushAddEvent(ev));
             }
           } else if (call.name === 'delete_event') {
-            const ev = allEvents?.find(e => e.id === call.args.id);
+            const ev = stateAllEvents?.find(e => e.id === call.args.id);
             batchedDeletes.push({ id: call.args.id, title: ev?.title || `Event #${call.args.id}`, start: ev?.start, end: ev?.end });
             allPendingCalls.push(call);
           } else if (call.name === 'update_event') {
-            const ev = allEvents?.find(e => e.id === call.args.id);
+            const ev = stateAllEvents?.find(e => e.id === call.args.id);
             batchedUpdates.push({ id: call.args.id, title: ev?.title || `Event #${call.args.id}`, updates: call.args.updates });
             allPendingCalls.push(call);
           } else if (call.name === 'clear_date_range') {
-            const queryResult = await executeQueryTool(call, allEvents);
+            const queryResult = await executeQueryTool(call, stateAllEvents);
             if (queryResult.requiresConfirmation && queryResult.eventsToDelete?.length > 0) {
               queryResult.eventsToDelete.forEach(ev => {
                 batchedDeletes.push(ev);
@@ -381,10 +617,10 @@ export default function ChatView({ user, accessToken }) {
             }
             queryResultsForAI.push({ name: call.name, result: queryResult, id: call.id });
           } else if (['query_tasks', 'query_expenses', 'query_habits', 'query_workout_plans', 'query_workout_logs'].includes(call.name)) {
-            const result = executeProductivityQuery(call.name, call.args, productivityData);
+            const result = executeProductivityQuery(call.name, call.args, stateProductivityData);
             queryResultsForAI.push({ name: call.name, result, id: call.id });
           } else if (QUERY_TOOLS.includes(call.name)) {
-            const result = await executeQueryTool(call, allEvents);
+            const result = await executeQueryTool(call, stateAllEvents);
             queryResultsForAI.push({ name: call.name, result, id: call.id });
           } else {
             const prod = mkProductivity(call);
@@ -396,23 +632,23 @@ export default function ChatView({ user, accessToken }) {
         if (queryResultsForAI.length > 0) {
           const followUp = await sendFunctionResultsToAI(
             aiResponse.chatInstance, queryResultsForAI,
-            allEvents, preferences, productivityData, textToSubmit
+            stateAllEvents, statePreferences, stateProductivityData, textToSubmit
           );
           if (followUp.isFunctionCall) {
             for (const call of followUp.functionCalls) {
               if (call.name === 'add_event') {
                 pushAddEvent(call.args);
               } else if (call.name === 'repeat_event') {
-                const result = await executeQueryTool(call, allEvents);
+                const result = await executeQueryTool(call, stateAllEvents);
                 if (result.requiresBatch && result.events?.length > 0) {
                   result.events.forEach(ev => pushAddEvent(ev));
                 }
               } else if (call.name === 'delete_event') {
-                const ev = allEvents?.find(e => e.id === call.args.id);
+                const ev = stateAllEvents?.find(e => e.id === call.args.id);
                 batchedDeletes.push({ id: call.args.id, title: ev?.title || `Event #${call.args.id}`, start: ev?.start, end: ev?.end });
                 allPendingCalls.push(call);
               } else if (call.name === 'update_event') {
-                const ev = allEvents?.find(e => e.id === call.args.id);
+                const ev = stateAllEvents?.find(e => e.id === call.args.id);
                 batchedUpdates.push({ id: call.args.id, title: ev?.title || `Event #${call.args.id}`, updates: call.args.updates });
                 allPendingCalls.push(call);
               } else {
@@ -421,15 +657,14 @@ export default function ChatView({ user, accessToken }) {
               }
             }
           } else if (followUp.text) {
-            await sendMessage('assistant', followUp.text, {}, currentSessionId);
+            await sendMessage('assistant', followUp.text, {}, finalSessionId);
           }
         }
 
         const hasPendingCalendar = batchedEvents.length > 0 || batchedDeletes.length > 0 || batchedUpdates.length > 0;
 
         if (pendingProductivityActions.length > 0 && !hasPendingCalendar) {
-          await sendMessage('assistant', aiResponse.text || 'Please review and confirm:', { pendingProductivityActions, isConfirmed: false }, currentSessionId);
-          setLoading(false);
+          await sendMessage('assistant', aiResponse.text || 'Please review and confirm:', { pendingProductivityActions, isConfirmed: false }, finalSessionId);
           return;
         }
         if (hasPendingCalendar) {
@@ -444,22 +679,23 @@ export default function ChatView({ user, accessToken }) {
             rawCalls: allPendingCalls,
             ...(pendingProductivityActions.length > 0 ? { pendingProductivityActions } : {}),
             isConfirmed: false,
-          }, currentSessionId);
-          setLoading(false);
+          }, finalSessionId);
           return;
         }
 
         if (!queryResultsForAI.length && aiResponse.text) {
-          await sendMessage('assistant', aiResponse.text, {}, currentSessionId);
+          // Persist to DB (will auto-merge with optimistic messages)
+          await sendMessage('assistant', aiResponse.text, {}, finalSessionId);
         }
-        setLoading(false);
         return;
       }
 
       if (aiResponse.text) {
-        await sendMessage('assistant', aiResponse.text, {}, currentSessionId);
+        // Persist to DB (will auto-merge with optimistic messages)
+        await sendMessage('assistant', aiResponse.text, {}, finalSessionId);
+        
         // Track AI usage via Cloud Function (secure, server-side)
-        if (user?.uid) {
+        if (stateUser?.uid) {
           const approxTokens = Math.ceil((textToSubmit.length + aiResponse.text.length) / 4);
           trackAiUsageSecure(approxTokens).catch(err => {
             console.warn('[Chat] Failed to track AI usage:', err);
@@ -468,15 +704,39 @@ export default function ChatView({ user, accessToken }) {
       }
     } catch (err) {
       console.error('Chat Error:', err);
-      if (activeSessionId) {
-        await sendMessage('assistant', 'Sorry, I encountered an error. Please try again.', {}, activeSessionId);
+      // Remove optimistic user message on error
+      setOptimisticMessages(prev => prev.filter(m => m.timestamp !== userMsgTimestamp));
+      if (finalSessionId) {
+        sendMessage('assistant', 'Sorry, I encountered an error. Please try again.', {}, finalSessionId).catch(console.error);
       }
     } finally {
-      setLoading(false);
+      // Keep thinking indicator visible a bit longer for smooth UX
+      setTimeout(() => {
+        setLoading(false);
+        setSessionLoading(prev => {
+          const next = { ...prev };
+          delete next[finalSessionId];
+          return next;
+        });
+      }, 300);
+      isSendingRef.current = false;
+      // Clear message ref after a delay to allow same message later
+      setTimeout(() => {
+        lastMessageRef.current = null;
+      }, 1000);
     }
-  };
+  }, []); // Empty deps - uses ref for all state
 
   const showEmptyState = !activeSessionId || !messages?.length;
+
+  // Track when we transition from empty to chat
+  useEffect(() => {
+    if (prevShowEmptyState.current && !showEmptyState) {
+      setIsTransitioning(true);
+      setTimeout(() => setIsTransitioning(false), 400);
+    }
+    prevShowEmptyState.current = showEmptyState;
+  }, [showEmptyState]);
 
   // ── Render ──────────────────────────────────────────────────────────────────
   const activeSession = sessions?.find(s => s.id === activeSessionId);
@@ -547,11 +807,12 @@ export default function ChatView({ user, accessToken }) {
           ) : (
             <ChatMessageList
               messages={messages}
-              loading={loading}
+              loading={isCurrentSessionLoading}
               scrollRef={scrollRef}
               onConfirmEvents={handleConfirmEvents}
               onConfirmProductivity={handleConfirmProductivity}
               activeMode={currentMode}
+              className={isTransitioning ? 'chat-transition-in' : ''}
             />
           )}
 

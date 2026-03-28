@@ -470,6 +470,264 @@
   transition: width 0.3s ease;
 }
 
+/* ═══ Transaction Tabs ═══ */
+.expenses-txn-tabs {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.expenses-txn-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--c-text-muted);
+  background: var(--c-surface-elevated);
+  border: 1px solid var(--c-border);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.expenses-txn-tab:hover {
+  color: var(--c-text);
+  border-color: color-mix(in srgb, var(--c-accent) 30%, transparent);
+}
+
+.expenses-txn-tab--active {
+  color: var(--c-accent);
+  background: color-mix(in srgb, var(--c-accent) 8%, var(--c-surface-elevated));
+  border-color: var(--c-accent);
+}
+
+/* ═══ Category Groups View ═══ */
+.expenses-category-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0 1.5rem;
+}
+
+.expenses-category-group {
+  border-radius: 14px;
+  background: var(--c-surface-elevated);
+  border: 1px solid var(--c-border);
+  overflow: hidden;
+}
+
+.expenses-category-group__header {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.75rem 1rem;
+  border-left: 3px solid;
+  background: color-mix(in srgb, var(--c-surface) 50%, transparent);
+}
+
+.expenses-category-group__icon {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.expenses-category-group__info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.expenses-category-group__name {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--c-text);
+}
+
+.expenses-category-group__count {
+  font-size: 0.6875rem;
+  color: var(--c-text-muted);
+}
+
+.expenses-category-group__total {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--c-text);
+}
+
+.expenses-category-group__total--income {
+  color: #10b981;
+}
+
+.expenses-category-group__items {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--c-border);
+}
+
+.expense-txn-item--compact {
+  padding: 0.625rem 1rem;
+  border-radius: 0;
+  border-bottom: 1px solid var(--c-border);
+}
+
+.expense-txn-item--compact:last-child {
+  border-bottom: none;
+}
+
+.expense-txn-item--compact .expense-txn-item__content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.expense-txn-item--compact .expense-txn-item__date {
+  font-size: 0.625rem;
+  color: var(--c-text-muted);
+}
+
+/* ═══ Chart View ═══ */
+.expenses-chart-view {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 0 1.5rem;
+}
+
+.expenses-chart-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.expenses-chart-bar {
+  padding: 0.75rem;
+  border-radius: 14px;
+  background: var(--c-surface-elevated);
+  border: 1px solid var(--c-border);
+}
+
+.expenses-chart-bar__header {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin-bottom: 0.5rem;
+}
+
+.expenses-chart-bar__icon {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.expenses-chart-bar__info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.expenses-chart-bar__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--c-text);
+}
+
+.expenses-chart-bar__amount {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--c-text-muted);
+}
+
+.expenses-chart-bar__pct {
+  font-size: 0.875rem;
+  font-weight: 800;
+  color: var(--c-text);
+}
+
+.expenses-chart-bar__track {
+  width: 100%;
+  height: 6px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--c-border) 40%, transparent);
+  overflow: hidden;
+}
+
+.expenses-chart-bar__fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.3s ease;
+}
+
+.expenses-chart-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  border-radius: 14px;
+  background: var(--c-surface-elevated);
+  border: 1px solid var(--c-border);
+}
+
+.expenses-chart-summary__item {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--c-surface) 50%, transparent);
+}
+
+.expenses-chart-summary__item--income {
+  color: #10b981;
+}
+
+.expenses-chart-summary__item--expense {
+  color: #ef4444;
+}
+
+.expenses-chart-summary__item--positive {
+  color: #10b981;
+}
+
+.expenses-chart-summary__item--negative {
+  color: #ef4444;
+}
+
+.expenses-chart-summary__label {
+  flex: 1;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--c-text-muted);
+}
+
+.expenses-chart-summary__value {
+  font-size: 0.875rem;
+  font-weight: 800;
+  color: var(--c-text);
+}
+
+.expenses-chart-summary__item--income .expenses-chart-summary__value,
+.expenses-chart-summary__item--positive .expenses-chart-summary__value {
+  color: #10b981;
+}
+
+.expenses-chart-summary__item--expense .expenses-chart-summary__value,
+.expenses-chart-summary__item--negative .expenses-chart-summary__value {
+  color: #ef4444;
+}
+
 /* ═══ AI Report Button ═══ */
 .expenses-ai-report {
   padding: 0 1.5rem;

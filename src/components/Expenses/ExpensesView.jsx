@@ -48,6 +48,7 @@ export default function ExpensesView({ onNavigate }) {
   const [showModal, setShowModal]       = useState(null); // 'expense' | 'income' | null
   const [filterMonth, setFilterMonth]   = useState(format(new Date(), 'yyyy-MM'));
   const [viewTab, setViewTab]           = useState('month'); // 'month' | 'year'
+  const [transactionTab, setTransactionTab] = useState('timeline'); // 'timeline' | 'category' | 'chart'
   const [selectedReport, setSelectedReport] = useState(null); // For report detail modal
   const [selectedYearMonth, setSelectedYearMonth] = useState(null); // For yearly drill-down
   const [generatingReport, setGeneratingReport] = useState(false); // Loading state for report generation
@@ -601,51 +602,36 @@ Format your response as JSON:
             )}
           </section>
 
-          {/* ═══ Category Breakdown ═══ */}
-          {Object.keys(byCategory).length > 0 && (
-            <section className="expenses-section">
-              <div className="expenses-section__header">
-                <h2 className="expenses-section__title">Spending by Category</h2>
-                <span className="expenses-section__meta">{Object.keys(byCategory).length} categories</span>
-              </div>
-              <div className="expenses-category-grid">
-                {EXPENSE_CATEGORIES
-                  .filter(c => byCategory[c.id])
-                  .sort((a, b) => (byCategory[b.id] || 0) - (byCategory[a.id] || 0))
-                  .map(cat => {
-                    const amount = byCategory[cat.id] || 0;
-                    const pct = totalExpense > 0 ? (amount / totalExpense) * 100 : 0;
-                    const CatIcon = cat.icon;
-                    return (
-                      <div key={cat.id} className="expense-category-card">
-                        <div className="expense-category-card__header">
-                          <div className="expense-category-card__icon" style={{ backgroundColor: cat.color + '15' }}>
-                            <CatIcon className="w-4 h-4" style={{ color: cat.color }} />
-                          </div>
-                          <div className="expense-category-card__info">
-                            <span className="expense-category-card__name">{cat.label}</span>
-                            <span className="expense-category-card__amount">{fmtIQD(amount)}</span>
-                          </div>
-                          <span className="expense-category-card__pct">{pct.toFixed(0)}%</span>
-                        </div>
-                        <div className="expense-category-card__bar">
-                          <div 
-                            className="expense-category-card__fill"
-                            style={{ width: `${pct}%`, backgroundColor: cat.color }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-              </div>
-            </section>
-          )}
-
           {/* ═══ Transaction Timeline ═══ */}
           <section className="expenses-section expenses-section--transactions">
             <div className="expenses-section__header">
               <h2 className="expenses-section__title">Transactions</h2>
               <span className="expenses-section__meta">{transactionCount} total</span>
+            </div>
+            
+            {/* Tab Navigation */}
+            <div className="expenses-txn-tabs">
+              <button 
+                className={`expenses-txn-tab ${transactionTab === 'timeline' ? 'expenses-txn-tab--active' : ''}`}
+                onClick={() => setTransactionTab('timeline')}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                Timeline
+              </button>
+              <button 
+                className={`expenses-txn-tab ${transactionTab === 'category' ? 'expenses-txn-tab--active' : ''}`}
+                onClick={() => setTransactionTab('category')}
+              >
+                <BarChart3 className="w-3.5 h-3.5" />
+                By Category
+              </button>
+              <button 
+                className={`expenses-txn-tab ${transactionTab === 'chart' ? 'expenses-txn-tab--active' : ''}`}
+                onClick={() => setTransactionTab('chart')}
+              >
+                <TrendingUp className="w-3.5 h-3.5" />
+                Chart
+              </button>
             </div>
             
             {transactions.length === 0 ? (
@@ -654,7 +640,8 @@ Format your response as JSON:
                 <p className="expenses-empty-state__title">No transactions yet</p>
                 <p className="expenses-empty-state__subtitle">Add your first income or expense to get started</p>
               </div>
-            ) : (
+            ) : transactionTab === 'timeline' ? (
+              /* Timeline View - by date */
               <div className="expenses-timeline">
                 {transactionsByDate.map(([date, dayTxns]) => {
                   const dateObj = new Date(date);
@@ -713,6 +700,150 @@ Format your response as JSON:
                     </div>
                   );
                 })}
+              </div>
+            ) : transactionTab === 'category' ? (
+              /* By Category List View */
+              <div className="expenses-category-groups">
+                {EXPENSE_CATEGORIES
+                  .filter(cat => transactions.some(t => t.category === cat.id && t.type === 'expense'))
+                  .sort((a, b) => (byCategory[b.id] || 0) - (byCategory[a.id] || 0))
+                  .map(cat => {
+                    const catTxns = transactions.filter(t => t.category === cat.id && t.type === 'expense');
+                    const catTotal = byCategory[cat.id] || 0;
+                    const CatIcon = cat.icon;
+                    
+                    return (
+                      <div key={cat.id} className="expenses-category-group">
+                        <div className="expenses-category-group__header" style={{ borderLeftColor: cat.color }}>
+                          <div className="expenses-category-group__icon" style={{ backgroundColor: cat.color + '15' }}>
+                            <CatIcon className="w-4 h-4" style={{ color: cat.color }} />
+                          </div>
+                          <div className="expenses-category-group__info">
+                            <span className="expenses-category-group__name">{cat.label}</span>
+                            <span className="expenses-category-group__count">{catTxns.length} transaction{catTxns.length > 1 ? 's' : ''}</span>
+                          </div>
+                          <span className="expenses-category-group__total">{fmtIQD(catTotal)}</span>
+                        </div>
+                        <div className="expenses-category-group__items">
+                          {catTxns.map(txn => (
+                            <div key={txn.id} className="expense-txn-item expense-txn-item--compact">
+                              <div className="expense-txn-item__content">
+                                <span className="expense-txn-item__note">{txn.note || cat.label}</span>
+                                <span className="expense-txn-item__date">{format(new Date(txn.date), 'MMM d')}</span>
+                              </div>
+                              <div className="expense-txn-item__right">
+                                <span className="expense-txn-item__amount">-{fmtIQD(txn.amount)}</span>
+                                <button 
+                                  onClick={() => deleteTransaction(txn.id)} 
+                                  className="expense-txn-item__delete"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                
+                {/* Income Section */}
+                {transactions.some(t => t.type === 'income') && (
+                  <div className="expenses-category-group">
+                    <div className="expenses-category-group__header" style={{ borderLeftColor: '#10b981' }}>
+                      <div className="expenses-category-group__icon" style={{ backgroundColor: '#10b98115' }}>
+                        <ArrowUpCircle className="w-4 h-4" style={{ color: '#10b981' }} />
+                      </div>
+                      <div className="expenses-category-group__info">
+                        <span className="expenses-category-group__name">Income</span>
+                        <span className="expenses-category-group__count">
+                          {transactions.filter(t => t.type === 'income').length} transaction{transactions.filter(t => t.type === 'income').length > 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      <span className="expenses-category-group__total expenses-category-group__total--income">
+                        +{fmtIQD(totalIncome)}
+                      </span>
+                    </div>
+                    <div className="expenses-category-group__items">
+                      {transactions.filter(t => t.type === 'income').map(txn => {
+                        const source = INCOME_SOURCES.find(s => s.id === txn.category);
+                        return (
+                          <div key={txn.id} className="expense-txn-item expense-txn-item--compact">
+                            <div className="expense-txn-item__content">
+                              <span className="expense-txn-item__note">{txn.note || source?.label || 'Income'}</span>
+                              <span className="expense-txn-item__date">{format(new Date(txn.date), 'MMM d')}</span>
+                            </div>
+                            <div className="expense-txn-item__right">
+                              <span className="expense-txn-item__amount expense-txn-item__amount--income">+{fmtIQD(txn.amount)}</span>
+                              <button 
+                                onClick={() => deleteTransaction(txn.id)} 
+                                className="expense-txn-item__delete"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Chart View - visual bars */
+              <div className="expenses-chart-view">
+                <div className="expenses-chart-bars">
+                  {EXPENSE_CATEGORIES
+                    .filter(cat => byCategory[cat.id])
+                    .sort((a, b) => (byCategory[b.id] || 0) - (byCategory[a.id] || 0))
+                    .map(cat => {
+                      const amount = byCategory[cat.id] || 0;
+                      const pct = totalExpense > 0 ? (amount / totalExpense) * 100 : 0;
+                      const CatIcon = cat.icon;
+                      
+                      return (
+                        <div key={cat.id} className="expenses-chart-bar">
+                          <div className="expenses-chart-bar__header">
+                            <div className="expenses-chart-bar__icon" style={{ backgroundColor: cat.color + '20' }}>
+                              <CatIcon className="w-4 h-4" style={{ color: cat.color }} />
+                            </div>
+                            <div className="expenses-chart-bar__info">
+                              <span className="expenses-chart-bar__label">{cat.label}</span>
+                              <span className="expenses-chart-bar__amount">{fmtIQD(amount)}</span>
+                            </div>
+                            <span className="expenses-chart-bar__pct">{pct.toFixed(0)}%</span>
+                          </div>
+                          <div className="expenses-chart-bar__track">
+                            <div 
+                              className="expenses-chart-bar__fill"
+                              style={{ width: `${pct}%`, backgroundColor: cat.color }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+                
+                {/* Income Summary */}
+                {totalIncome > 0 && (
+                  <div className="expenses-chart-summary">
+                    <div className="expenses-chart-summary__item expenses-chart-summary__item--income">
+                      <ArrowUpCircle className="w-4 h-4" />
+                      <span className="expenses-chart-summary__label">Total Income</span>
+                      <span className="expenses-chart-summary__value">+{fmtIQD(totalIncome)}</span>
+                    </div>
+                    <div className="expenses-chart-summary__item expenses-chart-summary__item--expense">
+                      <ArrowDownCircle className="w-4 h-4" />
+                      <span className="expenses-chart-summary__label">Total Spent</span>
+                      <span className="expenses-chart-summary__value">-{fmtIQD(totalExpense)}</span>
+                    </div>
+                    <div className={`expenses-chart-summary__item ${balance >= 0 ? 'expenses-chart-summary__item--positive' : 'expenses-chart-summary__item--negative'}`}>
+                      <Wallet className="w-4 h-4" />
+                      <span className="expenses-chart-summary__label">Balance</span>
+                      <span className="expenses-chart-summary__value">{balance >= 0 ? '+' : ''}{fmtIQD(balance)}</span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </section>

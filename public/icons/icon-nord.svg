@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+  <defs>
+    <linearGradient id="overlay" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:white;stop-opacity:0.15"/>
+      <stop offset="100%" style="stop-color:black;stop-opacity:0.1"/>
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="42" ry="42" fill="#88c0d0"/>
+  <rect width="192" height="192" rx="42" ry="42" fill="url(#overlay)"/>
+  <path d="M96,42 Q105,54 126,96 Q105,138 96,150 Q87,138 66,96 Q87,54 96,42 Z" fill="white" fill-opacity="0.95"/>
+  <circle cx="96" cy="96" r="19" fill="white" fill-opacity="0.5"/>
+</svg>

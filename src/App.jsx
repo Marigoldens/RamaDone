@@ -14,6 +14,7 @@ import { usePreferences } from './hooks/usePreferences';
 import { useGlobalApp, GlobalAppProvider } from './context/GlobalAppContext';
 import { findOrCreateRamadanCalendar } from './services/calendarService';
 import { applyTheme } from './config/theme';
+import { useThemedFavicon } from './hooks/useThemedFavicon';
 import LandingPage from './components/Landing/LandingPage';
 import AppShell from './components/Layout/AppShell';
 
@@ -44,6 +45,9 @@ function AppContent() {
       applyTheme(prefs.theme);
     }
   }, [prefs.theme]);
+
+  // Update favicon and PWA icons when theme changes
+  useThemedFavicon(prefs.theme || 'default');
 
   /**
    * Find or create the "Ramadan Schedule" calendar after sign-in.
