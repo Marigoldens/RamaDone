@@ -9,7 +9,7 @@ export default function IconGenerator() {
 
   const generateAllIcons = useCallback(() => {
     const themes = [
-      { name: 'icon-default', color: '#2563eb', label: 'Paper White' },
+      { name: 'icon-default', color: '#525252', label: 'Neutral Gray' },
       { name: 'icon-latte', color: '#fe640b', label: 'Latte' },
       { name: 'icon-dawn', color: '#ea9d34', label: 'Dawn' },
       { name: 'icon-mint', color: '#0d9488', label: 'Mint' },
@@ -35,7 +35,7 @@ export default function IconGenerator() {
   }, []);
 
   const previewThemes = [
-    { name: 'icon-default', label: 'Paper White', color: '#2563eb' },
+    { name: 'icon-default', label: 'Neutral Gray', color: '#525252' },
     { name: 'icon-latte', label: 'Latte', color: '#fe640b' },
     { name: 'icon-dawn', label: 'Dawn', color: '#ea9d34' },
     { name: 'icon-mint', label: 'Mint', color: '#0d9488' },

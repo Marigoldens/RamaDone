@@ -5,7 +5,7 @@
       <stop offset="100%" style="stop-color:black;stop-opacity:0.1"/>
     </linearGradient>
   </defs>
-  <rect width="192" height="192" rx="42" ry="42" fill="#2563eb"/>
+  <rect width="192" height="192" rx="42" ry="42" fill="#525252"/>
   <rect width="192" height="192" rx="42" ry="42" fill="url(#overlay)"/>
   <path d="M96,42 Q105,54 126,96 Q105,138 96,150 Q87,138 66,96 Q87,54 96,42 Z" fill="white" fill-opacity="0.95"/>
   <circle cx="96" cy="96" r="19" fill="white" fill-opacity="0.5"/>

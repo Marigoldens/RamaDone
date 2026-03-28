@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 // All 11 theme color mappings for favicons and meta theme-color
 export const THEME_COLORS = {
   // Light themes
-  default: { primary: '#2563eb' },
+  default: { primary: '#525252' },
   latte: { primary: '#fe640b' },
   dawn: { primary: '#ea9d34' },
   mint: { primary: '#0d9488' },

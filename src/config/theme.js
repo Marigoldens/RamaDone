@@ -15,10 +15,10 @@ export const THEMES = [
   // ─── LIGHT THEMES ─────────────────────────────────
   {
     id: 'default',
-    name: 'Paper White',
-    emoji: '�',
+    name: 'Neutral Gray',
+    emoji: '⚪',
     className: '',       // :root styles apply (no extra class)
-    description: 'Clean minimal light theme, like iOS or Notion',
+    description: 'Clean minimal neutral gray theme, modern and balanced',
   },
   {
     id: 'latte',
