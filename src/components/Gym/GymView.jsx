@@ -42,7 +42,7 @@ function parsePlanText(text) {
   return results;
 }
 
-export default function GymView() {
+export default function GymView({ onNavigate }) {
   const [activeSubTab, setActiveSubTab] = useState('plans');
   const [showAddPlan, setShowAddPlan] = useState(false);
   const [editingPlan, setEditingPlan] = useState(null);
@@ -622,6 +622,7 @@ export default function GymView() {
           initialPlan={editingPlan}
           onSave={savePlan}
           onClose={() => { setShowAddPlan(false); setEditingPlan(null); }}
+          onNavigateToChat={() => { setShowAddPlan(false); onNavigate?.('chat'); }}
         />
       )}
     </div>

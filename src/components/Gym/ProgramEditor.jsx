@@ -35,7 +35,7 @@ function parsePlanText(text) {
 /**
  * Full-screen Program Editor - Optimized for desktop and mobile
  */
-export default function ProgramEditor({ initialPlan, onSave, onClose }) {
+export default function ProgramEditor({ initialPlan, onSave, onClose, onNavigateToChat }) {
   const [name, setName] = useState(initialPlan?.name || '');
   const [type, setType] = useState(initialPlan?.type || 'Custom');
   const [exercises, setExercises] = useState(
@@ -216,7 +216,7 @@ export default function ProgramEditor({ initialPlan, onSave, onClose }) {
                   Too lazy to type? Just tell our AI what you want and it&apos;ll create the perfect program for you automatically!
                 </p>
                 <button
-                  onClick={() => onClose()}
+                  onClick={() => onNavigateToChat?.()}
                   className="program-editor__ai-btn"
                 >
                   <MessageCircle size={16} />
