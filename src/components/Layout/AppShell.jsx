@@ -82,7 +82,7 @@ export default function AppShell({ user, accessToken, onSignIn, onSignOut }) {
         )}
         {activeTab === 'gym' && (
           <div key="gym" className={getPageClass()}>
-            <GymView />
+            <GymView onNavigate={setActiveTab} />
           </div>
         )}
         {activeTab === 'prayers' && (
