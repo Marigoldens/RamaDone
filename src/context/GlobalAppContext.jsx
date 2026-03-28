@@ -11,6 +11,7 @@
  * RESULT: Zero loading time on every page - everything is pre-cached.
  */
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { format, subDays, startOfMonth, endOfMonth, addMonths, isSameMonth, startOfWeek, endOfWeek } from 'date-fns';
 import db from '../db/dexie';
 import { fetchMonthPrayerTimes, parsePrayerTime } from '../services/prayerService';
@@ -153,6 +154,49 @@ export function GlobalAppProvider({ children }) {
 
     preloadAllData();
   }, []);
+
+  // ─── Live Queries: Keep data synced after initial preload ───
+  const liveWorkoutPlans = useLiveQuery(() => db.workoutPlans.toArray(), []) ?? [];
+  const liveHabits = useLiveQuery(() => db.habits.where('archived').equals(0).toArray(), []) ?? [];
+  const liveHabitLogs = useLiveQuery(() => db.habitLogs.toArray(), []) ?? [];
+  const liveTasks = useLiveQuery(() => db.tasks.toArray(), []) ?? [];
+  const liveExpenses = useLiveQuery(() => db.expenses.toArray(), []) ?? [];
+  const liveEvents = useLiveQuery(() => db.events.toArray(), []) ?? [];
+  const liveWorkoutLogs = useLiveQuery(() => db.workoutLogs.toArray(), []) ?? [];
+  const liveChatSessions = useLiveQuery(() => db.chatSessions.orderBy('updatedAt').reverse().toArray(), []) ?? [];
+  
+  // Sync live data into state
+  useEffect(() => {
+    setWorkoutPlans(liveWorkoutPlans);
+  }, [liveWorkoutPlans]);
+  
+  useEffect(() => {
+    setHabits(liveHabits);
+  }, [liveHabits]);
+  
+  useEffect(() => {
+    setHabitLogs(liveHabitLogs);
+  }, [liveHabitLogs]);
+  
+  useEffect(() => {
+    setTasks(liveTasks);
+  }, [liveTasks]);
+  
+  useEffect(() => {
+    setExpenses(liveExpenses);
+  }, [liveExpenses]);
+  
+  useEffect(() => {
+    setEvents(liveEvents);
+  }, [liveEvents]);
+  
+  useEffect(() => {
+    setWorkoutLogs(liveWorkoutLogs);
+  }, [liveWorkoutLogs]);
+  
+  useEffect(() => {
+    setChatSessions(liveChatSessions);
+  }, [liveChatSessions]);
   
   // ─── Helper: Sync prayer times for a month ───
   const syncPrayerMonth = useCallback(async (monthDate, lat, lon, method) => {

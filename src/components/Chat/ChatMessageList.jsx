@@ -8,9 +8,6 @@ import InChatTaskCard from './InChatTaskCard';
  * Handles the loading indicator when AI is thinking.
  */
 export default function ChatMessageList({ messages, loading, scrollRef, onConfirmEvents, onConfirmProductivity, activeMode, className }) {
-  // Debug: log loading state changes
-  console.log('[ChatMessageList] loading:', loading, 'messages count:', messages?.length);
-  
   return (
     <div ref={scrollRef} className={`chat-messages-scroll ${className || ''}`}>
       <div className="chat-messages-inner">
