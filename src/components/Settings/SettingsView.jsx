@@ -39,10 +39,6 @@ export default function SettingsView({ user, onSignOut }) {
           </div>
           <h1>Account &amp; Settings</h1>
         </div>
-        <div className="settings-header__badge">
-          <span className="settings-header__dot" />
-          v1.0 Pro
-        </div>
       </header>
 
       {/* ── SCROLLABLE BODY ────────────────────────── */}
