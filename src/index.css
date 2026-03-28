@@ -75,27 +75,27 @@
    PAPER WHITE — Clean Minimal Light (Default)
    ========================================== */
 :root {
-  --c-primary: #2563eb;
-  --c-primary-light: #3b82f6;
+  --c-primary: #525252;
+  --c-primary-light: #737373;
   --c-surface: #ffffff;
-  --c-surface-elevated: #f8fafc;
-  --c-text: #0f172a;
-  --c-text-muted: #475569;
-  --c-accent: #2563eb;
-  --c-accent-glow: rgba(37, 99, 235, 0.15);
-  --c-prayer: #1e40af;
-  --c-prayer-text: #dbeafe;
-  --c-iftar: #f59e0b;
-  --c-iftar-text: #0f172a;
-  --c-border: #e2e8f0;
+  --c-surface-elevated: #fafafa;
+  --c-text: #171717;
+  --c-text-muted: #525252;
+  --c-accent: #525252;
+  --c-accent-glow: rgba(82, 82, 82, 0.15);
+  --c-prayer: #404040;
+  --c-prayer-text: #f5f5f5;
+  --c-iftar: #d97706;
+  --c-iftar-text: #171717;
+  --c-border: #e5e5e5;
   --c-nav-bg: #ffffff;
   /* Chat mode accent colors - vibrant */
-  --c-mode-all: #3b82f6;
-  --c-mode-calendar: #8b5cf6;
-  --c-mode-tasks: #f97316;
-  --c-mode-expenses: #10b981;
-  --c-mode-habits: #ec4899;
-  --c-mode-gym: #ef4444;
+  --c-mode-all: #525252;
+  --c-mode-calendar: #7c3aed;
+  --c-mode-tasks: #d97706;
+  --c-mode-expenses: #16a34a;
+  --c-mode-habits: #db2777;
+  --c-mode-gym: #dc2626;
 }
 
 /* ==========================================
