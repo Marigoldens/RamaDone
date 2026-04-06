@@ -6,15 +6,13 @@
  * OAuthCredential. This token is what we use to call the Google
  * Calendar API directly (no Firebase Cloud Function needed for CRUD).
  *
- * The access token is stored in-memory (not persisted) because:
- * 1. It expires in ~1 hour anyway.
- * 2. Firebase re-authenticates silently on page reload, so we can
- *    re-extract the token if needed (or prompt re-sign-in).
+ * TOKEN PERSISTENCE:
+ * The access token is persisted to IndexedDB (via Dexie) so users stay
+ * authorized across page reloads. Tokens expire in ~1 hour, so we also
+ * store the expiry time. On restore, we check if the token is still valid.
  *
- * LIMITATION: The token from signInWithPopup is only available at the
- * moment of sign-in. After a page refresh, Firebase restores the
- * user session but NOT the OAuth token. For a production app, you'd
- * use a server-side flow. For this MVP, we re-prompt on token expiry.
+ * LIMITATION: The token from signInWithPopup expires after ~1 hour.
+ * For expired tokens, we re-prompt sign-in (MVP behavior).
  */
 import {
   signInWithPopup,
@@ -26,6 +24,76 @@ import { auth, googleProvider } from '../config/firebase';
 /** In-memory store for the Google OAuth access token */
 let cachedAccessToken = null;
 
+const TOKEN_KEY = 'google_oauth';
+
+/**
+ * Save token to persistent storage (IndexedDB via Dexie)
+ * @param {string} token
+ * @param {number} expiresInSeconds - typically 3600 (1 hour)
+ */
+async function persistToken(token, expiresInSeconds = 3600) {
+  try {
+    const { db } = await import('../db/dexie');
+    const expiresAt = Date.now() + (expiresInSeconds * 1000);
+    await db.authTokens.put({
+      id: TOKEN_KEY,
+      accessToken: token,
+      expiresAt,
+      createdAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.warn('[authService] Failed to persist token:', err);
+  }
+}
+
+/**
+ * Load token from persistent storage
+ * @returns {Promise<{accessToken: string, expiresAt: number} | null>}
+ */
+async function loadPersistedToken() {
+  try {
+    const { db } = await import('../db/dexie');
+    const record = await db.authTokens.get(TOKEN_KEY);
+    if (!record) return null;
+    
+    // Check if token is expired (with 5min buffer)
+    if (Date.now() > record.expiresAt - 5 * 60 * 1000) {
+      await db.authTokens.delete(TOKEN_KEY);
+      return null;
+    }
+    
+    return record;
+  } catch (err) {
+    console.warn('[authService] Failed to load persisted token:', err);
+    return null;
+  }
+}
+
+/**
+ * Clear persisted token
+ */
+async function clearPersistedToken() {
+  try {
+    const { db } = await import('../db/dexie');
+    await db.authTokens.delete(TOKEN_KEY);
+  } catch (err) {
+    console.warn('[authService] Failed to clear persisted token:', err);
+  }
+}
+
+/**
+ * Restore token from storage on app startup
+ * @returns {Promise<string | null>}
+ */
+export async function restoreTokenFromStorage() {
+  const record = await loadPersistedToken();
+  if (record) {
+    cachedAccessToken = record.accessToken;
+    return record.accessToken;
+  }
+  return null;
+}
+
 /**
  * Sign in with Google using popup.
  */
@@ -34,6 +102,12 @@ export async function signInWithGoogle() {
     const result = await signInWithPopup(auth, googleProvider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
     cachedAccessToken = credential?.accessToken || null;
+    
+    // Persist token (expires in ~1 hour)
+    if (cachedAccessToken) {
+      await persistToken(cachedAccessToken, 3600);
+    }
+    
     return { user: result.user, accessToken: cachedAccessToken };
   } catch (error) {
     console.error('Google Sign-In Error:', error);
@@ -47,6 +121,7 @@ export async function signInWithGoogle() {
  */
 export async function signOutUser() {
   cachedAccessToken = null;
+  await clearPersistedToken();
   await firebaseSignOut(auth);
 }
 

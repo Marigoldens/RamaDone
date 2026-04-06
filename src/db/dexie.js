@@ -131,12 +131,12 @@ db.version(9).stores({
 });
 
 /**
- * Version 10: User tracking for admin dashboard
+ * Version 11: Persist auth tokens for seamless re-auth on refresh
  * 
  * NEW TABLE:
- * - users: Tracks all users who have signed in
+ * - authTokens: Stores Google OAuth tokens with expiry tracking
  */
-db.version(10).stores({
+db.version(11).stores({
   chatSessions: '++id, title, updatedAt, starred, mode',
   messages: '++id, sessionId, role, timestamp',
   events: '++id, googleId, title, start, end, type, date, synced, updatedAt, deleted',
@@ -152,6 +152,7 @@ db.version(10).stores({
   workoutLogs: '++id, date, planId, duration, createdAt',
   monthlyReports: '++id, month, title, createdAt',
   users: 'uid, email, displayName, photoURL, lastLogin, createdAt, totalMessages, totalTokens, lastAiRequest',
+  authTokens: 'id, accessToken, expiresAt, createdAt',
 });
 
 export default db;

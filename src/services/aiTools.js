@@ -224,9 +224,9 @@ export function getToolDeclarations() {
       parameters: {
         type: "OBJECT",
         properties: {
-          amount:   { type: "STRING",  description: "Amount as a number string, e.g. '45.5'" },
+          amount:   { type: "STRING",  description: "Amount in IQD as a number string, e.g. '50000'. Convert k-notation: 50k → '50000', 30k → '30000', 1.5k → '1500'." },
           type:     { type: "STRING",  description: "'expense' or 'income'" },
-          category: { type: "STRING",  description: "Category, e.g. 'Food', 'Transport', 'Health'" },
+          category: { type: "STRING",  description: "Category: 'food', 'transport', 'health', 'utilities', 'shopping', 'entertainment', or 'other'" },
           date:     { type: "STRING",  description: "Date YYYY-MM-DD (defaults to today)" },
           note:     { type: "STRING",  description: "Optional description" },
         },

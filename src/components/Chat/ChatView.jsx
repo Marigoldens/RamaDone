@@ -75,7 +75,8 @@ export default function ChatView({ user, accessToken }) {
   const todayDate = format(new Date(), 'yyyy-MM-dd');
   const eventsHook = useEvents(todayDate);
   const allEvents = useAllEvents();
-  const { prefs: preferences } = usePreferences();
+  const { prefs: preferences, setPref } = usePreferences();
+  const AI_MONTHLY_LIMIT = 100;
 
   // Live productivity data for AI context and tool execution
   const tasks = useLiveQuery(() => db.tasks.toArray(), [], []);
@@ -164,35 +165,38 @@ export default function ChatView({ user, accessToken }) {
   };
 
   // ── INSTANT: Confirm productivity actions with optimistic updates ──
-  const handleConfirmProductivity = async (messageId, pendingActions) => {
+  const handleConfirmProductivity = async (messageId, pendingActions, _unused) => {
+    // pendingActions may be the edited mutableActions array from InChatTaskCard
     // ── INSTANT: Update UI immediately ──
     const optimisticUpdates = [];
     const timestamp = Date.now();
+    let idx = 0;
     
     for (const action of pendingActions) {
+      const uid = `${timestamp}-${idx++}`;
       if (action.tool === 'add_task') {
         optimisticUpdates.push({
           type: 'task',
-          tempId: `temp-task-${timestamp}`,
-          data: { id: `temp-task-${timestamp}`, title: action.args.title, priority: action.args.priority || 'medium', dueDate: action.args.dueDate, category: action.args.category, notes: action.args.notes, status: action.args.status || 'todo', createdAt: timestamp, updatedAt: timestamp }
+          tempId: `temp-task-${uid}`,
+          data: { id: `temp-task-${uid}`, title: action.args.title, priority: action.args.priority || 'medium', dueDate: action.args.dueDate, category: action.args.category, notes: action.args.notes, status: action.args.status || 'todo', createdAt: timestamp, updatedAt: timestamp }
         });
       } else if (action.tool === 'add_expense') {
         optimisticUpdates.push({
           type: 'expense',
-          tempId: `temp-expense-${timestamp}`,
-          data: { id: `temp-expense-${timestamp}`, amount: parseFloat(action.args.amount) || 0, type: action.args.type || 'expense', category: (action.args.category || 'other').toLowerCase(), date: action.args.date || todayDate, note: action.args.note || null, createdAt: timestamp }
+          tempId: `temp-expense-${uid}`,
+          data: { id: `temp-expense-${uid}`, amount: parseFloat(action.args.amount) || 0, type: action.args.type || 'expense', category: (action.args.category || 'other').toLowerCase(), date: action.args.date || todayDate, note: action.args.note || null, createdAt: timestamp }
         });
       } else if (action.tool === 'add_habit') {
         optimisticUpdates.push({
           type: 'habit',
-          tempId: `temp-habit-${timestamp}`,
-          data: { id: `temp-habit-${timestamp}`, name: action.args.name, emoji: action.args.emoji || '🎯', category: action.args.category?.toLowerCase() || null, frequency: action.args.frequency || 'daily', archived: 0, createdAt: new Date().toISOString() }
+          tempId: `temp-habit-${uid}`,
+          data: { id: `temp-habit-${uid}`, name: action.args.name, emoji: action.args.emoji || '🎯', category: action.args.category?.toLowerCase() || null, frequency: action.args.frequency || 'daily', archived: 0, createdAt: new Date().toISOString() }
         });
       } else if (action.tool === 'log_habit') {
         optimisticUpdates.push({
           type: 'habitLog',
-          tempId: `temp-log-${timestamp}`,
-          data: { id: `temp-log-${timestamp}`, habitId: action.args.habitId, date: action.args.date, completed: action.args.completed, count: 1, note: '' }
+          tempId: `temp-log-${uid}`,
+          data: { id: `temp-log-${uid}`, habitId: action.args.habitId, date: action.args.date, completed: action.args.completed, count: 1, note: '' }
         });
       }
     }
@@ -359,6 +363,10 @@ export default function ChatView({ user, accessToken }) {
     todayDate
   });
   
+  // Stable ref to setPref so the send handler can call it without stale closures
+  const setPrefRef = useRef(setPref);
+  useEffect(() => { setPrefRef.current = setPref; }, [setPref]);
+
   // Update the send logic ref whenever dependencies change
   useEffect(() => {
     sendLogicRef.current = {
@@ -501,9 +509,28 @@ export default function ChatView({ user, accessToken }) {
       }
 
       if (!hasAccess) {
-        // Remove optimistic message and show error
         setOptimisticMessages(prev => prev.filter(m => m.timestamp !== userMsgTimestamp));
         await sendMessage('assistant', '⚠️ You do not have API access yet. Please contact the admin to grant you access to use AI features.', {}, finalSessionId);
+        return;
+      }
+
+      // ── Monthly message limit (Ramadan Bundle: 100 msg/month) ──────────────
+      const currentMonthStr = format(new Date(), 'yyyy-MM');
+      const storedMonth    = statePreferences?.aiMessagesMonth;
+      let monthlyCount     = statePreferences?.aiMessagesThisMonth ?? 0;
+
+      // Auto-reset counter when month rolls over
+      if (storedMonth !== currentMonthStr) {
+        monthlyCount = 0;
+        await setPrefRef.current('aiMessagesMonth', currentMonthStr);
+        await setPrefRef.current('aiMessagesThisMonth', 0);
+      }
+
+      if (monthlyCount >= AI_MONTHLY_LIMIT) {
+        setOptimisticMessages(prev => prev.filter(m => m.timestamp !== userMsgTimestamp));
+        await sendMessage('assistant',
+          `🚫 **Monthly limit reached.** You’ve used all ${AI_MONTHLY_LIMIT} AI messages for ${currentMonthStr}. Your allowance resets on the 1st of next month. Upgrade to a higher plan for unlimited access.`,
+          {}, finalSessionId);
         return;
       }
 
@@ -513,6 +540,9 @@ export default function ChatView({ user, accessToken }) {
       const currentMessages = [...(stateMessages || []), { role: 'user', content: textToSubmit }];
       // Pass currentMode (session mode or bar selection) — aiService auto-detects domain when mode is 'all'
       let aiResponse = await chatWithAI(currentMessages, stateAllEvents, statePreferences, statePrayerTimes ? statePrayerTimes : null, stateProductivityData, stateCurrentMode);
+
+      // Increment monthly AI message counter on every successful call
+      await setPrefRef.current('aiMessagesThisMonth', monthlyCount + 1);
 
       // ── Auto-categorize session based on detected domain ──────────────────
       // Only fires when the user is in 'all' (auto) mode — if they explicitly
@@ -575,7 +605,7 @@ export default function ChatView({ user, accessToken }) {
             case 'add_task': return { tool: call.name, args: cleanArgs, display: `Add task: "${cleanArgs.title}"`, sub: `Priority: ${cleanArgs.priority || 'medium'}${cleanArgs.dueDate ? ` · Due ${cleanArgs.dueDate}` : ''}` };
             case 'update_task': return { tool: call.name, args: cleanArgs, display: `Update task: "${t?.title || `#${cleanArgs.id}`}"`, sub: JSON.stringify(cleanArgs.updates) };
             case 'delete_task': return { tool: call.name, args: cleanArgs, display: `Delete task: "${t?.title || `#${cleanArgs.id}`}"`, sub: 'Cannot be undone', danger: true };
-            case 'add_expense': return { tool: call.name, args: cleanArgs, display: `Log ${cleanArgs.type}: ${cleanArgs.amount} · ${cleanArgs.category}`, sub: cleanArgs.note || cleanArgs.date || stateTodayDate };
+            case 'add_expense': return { tool: call.name, args: cleanArgs, display: `Log ${cleanArgs.type}: ${Math.round(parseFloat(cleanArgs.amount) || 0).toLocaleString()} IQD · ${cleanArgs.category}`, sub: cleanArgs.note || cleanArgs.date || stateTodayDate };
             case 'update_expense': return { tool: call.name, args: cleanArgs, display: `Edit expense #${cleanArgs.id}`, sub: Object.entries(cleanArgs.updates || {}).map(([k, v]) => `${k}: ${v}`).join(', ') };
             case 'delete_expense': return { tool: call.name, args: cleanArgs, display: `Delete entry #${cleanArgs.id}`, sub: 'Expense entry', danger: true };
             case 'add_habit': return { tool: call.name, args: cleanArgs, display: `Add habit: "${cleanArgs.name}"`, sub: `${cleanArgs.emoji || '🎯'} · ${cleanArgs.frequency || 'daily'}${cleanArgs.category ? ` · ${cleanArgs.category}` : ''}` };
@@ -587,6 +617,7 @@ export default function ChatView({ user, accessToken }) {
             case 'delete_workout_plan': return { tool: call.name, args: cleanArgs, display: `Delete plan: "${cleanArgs.planName || `#${cleanArgs.id}`}"`, sub: 'Cannot be undone', danger: true };
             case 'add_workout_log': return { tool: call.name, args: cleanArgs, display: `Log workout: "${cleanArgs.planName}"`, sub: `${(cleanArgs.exercises || []).length} exercises` };
             case 'delete_workout_log': return { tool: call.name, args: cleanArgs, display: `Delete workout log #${cleanArgs.id}`, sub: 'Cannot be undone', danger: true };
+            case 'generate_monthly_report': return { tool: call.name, args: cleanArgs, display: `📊 Generate AI report: ${cleanArgs.month}`, sub: cleanArgs.title || 'Monthly expense analysis with AI insights' };
             default: return null;
           }
         };
@@ -691,10 +722,7 @@ export default function ChatView({ user, accessToken }) {
       }
 
       if (aiResponse.text) {
-        // Persist to DB (will auto-merge with optimistic messages)
         await sendMessage('assistant', aiResponse.text, {}, finalSessionId);
-        
-        // Track AI usage via Cloud Function (secure, server-side)
         if (stateUser?.uid) {
           const approxTokens = Math.ceil((textToSubmit.length + aiResponse.text.length) / 4);
           trackAiUsageSecure(approxTokens).catch(err => {
@@ -720,10 +748,10 @@ export default function ChatView({ user, accessToken }) {
         });
       }, 300);
       isSendingRef.current = false;
-      // Clear message ref after a delay to allow same message later
+      // Clear message ref after 10s — prevents accidental double-sends of identical messages
       setTimeout(() => {
         lastMessageRef.current = null;
-      }, 1000);
+      }, 10000);
     }
   }, []); // Empty deps - uses ref for all state
 
@@ -816,12 +844,41 @@ export default function ChatView({ user, accessToken }) {
             />
           )}
 
+          {/* Monthly usage badge */}
+          {(() => {
+            const used = preferences?.aiMessagesThisMonth ?? 0;
+            const remaining = AI_MONTHLY_LIMIT - used;
+            const pct = (used / AI_MONTHLY_LIMIT) * 100;
+            if (used === 0) return null;
+            const color = remaining <= 0 ? '#ef4444' : remaining <= 10 ? '#f59e0b' : 'var(--c-text-muted)';
+            return (
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                gap: '6px', padding: '4px 12px', fontSize: '11px', color,
+                borderTop: '1px solid var(--c-border)',
+                background: remaining <= 10 ? `color-mix(in srgb, ${color} 6%, transparent)` : 'transparent',
+              }}>
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <circle cx="5" cy="5" r="4.5" stroke={color} strokeWidth="1" fill="none" />
+                  <path d={`M 5 5 L 5 0.5 A 4.5 4.5 0 ${pct > 50 ? 1 : 0} 1 ${5 + 4.5 * Math.sin(pct / 100 * 2 * Math.PI)} ${5 - 4.5 * Math.cos(pct / 100 * 2 * Math.PI)} Z`}
+                    fill={color} opacity="0.4" />
+                </svg>
+                <span>
+                  {remaining <= 0
+                    ? `Monthly limit reached — resets 1 ${new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toLocaleString('default', { month: 'long' })}`
+                    : `${used}/${AI_MONTHLY_LIMIT} AI messages this month`
+                  }
+                </span>
+              </div>
+            );
+          })()}
+
           {/* Input bar */}
           <ChatInputBar
             input={input}
             setInput={setInput}
-            loading={loading}
-            onSend={handleSend}
+            loading={loading || (preferences?.aiMessagesThisMonth ?? 0) >= AI_MONTHLY_LIMIT}
+            onSend={(preferences?.aiMessagesThisMonth ?? 0) >= AI_MONTHLY_LIMIT ? undefined : handleSend}
             inputRef={inputRef}
             ramadanMode={ramadanMode}
             activeMode={currentMode}

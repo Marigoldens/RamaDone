@@ -209,7 +209,7 @@ export function executeProductivityQuery(callName, callArgs, productivityData) {
       return true;
     });
     const slim = f.slice(0, 50).map(e => ({ id: e.id, amount: e.amount, type: e.type, category: e.category, date: e.date, note: e.note || null }));
-    return { expenses: slim, total: f.length, totalAmount: f.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0).toFixed(2), truncated: f.length > 50 };
+    return { expenses: slim, total: f.length, totalAmount: Math.round(f.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0)), truncated: f.length > 50 };
   }
 
   if (callName === 'query_habits') {
@@ -268,8 +268,8 @@ export function executeProductivityQuery(callName, callArgs, productivityData) {
   }
 
   if (callName === 'get_exercise_progression') {
-    const kw = callArgs.exercise_name?.toLowerCase();
-    if (!kw) return { error: "Missing exercise_name" };
+    const kw = (callArgs.exerciseName || callArgs.exercise_name)?.toLowerCase();
+    if (!kw) return { error: "Missing exerciseName" };
     
     // Sort logs oldest to newest
     const sortedLogs = [...workoutLogs].sort((a, b) => {

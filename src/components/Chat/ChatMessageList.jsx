@@ -47,7 +47,7 @@ export default function ChatMessageList({ messages, loading, scrollRef, onConfir
                 <InChatTaskCard
                   actions={msg.pendingProductivityActions}
                   isConfirmed={msg.isConfirmed}
-                  onConfirm={() => onConfirmProductivity(msg.id, msg.pendingProductivityActions)}
+                  onConfirm={(editedActions) => onConfirmProductivity(msg.id, editedActions ?? msg.pendingProductivityActions)}
                 />
               )}
             </div>

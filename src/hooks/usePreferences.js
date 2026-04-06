@@ -39,6 +39,9 @@ const DEFAULTS = {
   prayersWidgetMode: 'next', // 'next' | 'all'
   // UI preferences
   handedness: 'right', // 'left' | 'right' - for mobile FAB positioning
+  // AI usage tracking (Ramadan Bundle: 100 messages/month)
+  aiMessagesThisMonth: 0,
+  aiMessagesMonth: null, // 'YYYY-MM' — resets automatically each new month
 };
 
 /**

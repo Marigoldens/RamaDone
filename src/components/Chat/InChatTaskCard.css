@@ -85,7 +85,203 @@
   text-overflow: ellipsis;
 }
 
-/* Confirm button */
+/* Item content layout (icon + full-width content) */
+.inchat-task-item-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.inchat-task-item-main-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+/* Editing row highlight */
+.inchat-task-item.editing {
+  background: var(--color-surface-elevated, rgba(139,92,246,0.06));
+  border-left: 2px solid var(--color-accent, #8b5cf6);
+  padding-left: calc(0.75rem - 2px);
+}
+
+/* Gym exercise sub-line */
+.inchat-task-item-sub--gym {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.inchat-gym-type {
+  color: var(--color-text-tertiary, #9ca3af);
+  font-size: 0.75rem;
+}
+
+.inchat-ex-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.inchat-ex-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.15rem 0.45rem;
+  background: var(--color-surface-elevated, rgba(139,92,246,0.1));
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.inchat-ex-chip strong {
+  color: var(--color-accent, #8b5cf6);
+}
+
+/* Edit pencil button (per row) */
+.inchat-edit-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-muted, #6b7280);
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+
+.inchat-task-item:hover .inchat-edit-btn,
+.inchat-task-item.editing .inchat-edit-btn {
+  opacity: 1;
+}
+
+.inchat-edit-btn:hover {
+  background: var(--color-surface-elevated);
+  color: var(--color-text-primary);
+}
+
+.inchat-edit-btn--active {
+  opacity: 1 !important;
+  background: var(--color-surface-elevated);
+  color: var(--color-danger, #ef4444);
+  border-color: var(--color-danger, #ef4444);
+}
+
+/* ── Inline edit form ──────────────────────────────────────────────── */
+.edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.5rem 0 0.25rem;
+}
+
+.edit-form-row {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.edit-form-row--exercise {
+  align-items: center;
+  flex-wrap: wrap;
+  background: var(--color-surface-alt, rgba(255,255,255,0.03));
+  border-radius: 6px;
+  padding: 0.25rem 0.4rem;
+}
+
+.edit-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.3rem 0.5rem;
+  background: var(--color-surface-elevated, rgba(255,255,255,0.06));
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text-primary);
+  font-size: 0.78rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.edit-input:focus {
+  border-color: var(--color-accent, #8b5cf6);
+}
+
+.edit-input--full  { width: 100%; flex: unset; }
+.edit-input--emoji { flex: 0 0 2.4rem; text-align: center; font-size: 1rem; padding: 0.2rem; }
+.edit-input--tiny  { flex: 0 0 3.2rem; text-align: center; }
+
+.edit-select {
+  flex: 1;
+  padding: 0.3rem 0.4rem;
+  background: var(--color-surface-elevated, rgba(255,255,255,0.06));
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text-primary);
+  font-size: 0.78rem;
+  outline: none;
+  cursor: pointer;
+}
+
+.edit-select--full { width: 100%; flex: unset; }
+
+.edit-ex-name {
+  font-size: 0.76rem;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+  flex: 1;
+  min-width: 80px;
+}
+
+.edit-label {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.edit-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  padding-top: 0.15rem;
+}
+
+.edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.edit-btn--cancel {
+  background: transparent;
+  border-color: var(--color-border);
+  color: var(--color-text-muted);
+}
+.edit-btn--cancel:hover { background: var(--color-surface-elevated); }
+
+.edit-btn--save {
+  background: var(--color-accent, #8b5cf6);
+  color: #fff;
+}
+.edit-btn--save:hover { opacity: 0.88; }
+
+/* ── Confirm button ──────────────────────────────────────────────────── */
 .inchat-task-confirm-btn {
   display: flex;
   align-items: center;
@@ -101,9 +297,34 @@
   font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition: opacity 0.15s, background 0.15s;
 }
 
-.inchat-task-confirm-btn:hover {
+.inchat-task-confirm-btn:hover:not(:disabled) {
   opacity: 0.88;
+}
+
+.inchat-task-confirm-btn.submitting,
+.inchat-task-confirm-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: var(--color-surface-elevated);
+  color: var(--color-text-muted);
+}
+
+/* Card submitting state */
+.inchat-task-card.submitting {
+  opacity: 0.85;
+  pointer-events: none;
+}
+.inchat-task-card.submitting .inchat-task-confirm-btn {
+  pointer-events: auto;
+}
+
+/* Spin animation for loading icon */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.spin-icon {
+  animation: spin 0.9s linear infinite;
 }

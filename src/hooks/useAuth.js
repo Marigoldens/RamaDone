@@ -9,14 +9,15 @@
  * - Stores the Google OAuth access token in-memory (via authService)
  * - Exposes a clean API: { user, loading, accessToken, signIn, signOut }
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import {
   signInWithGoogle,
   signOutUser,
   getAccessToken,
-  trackUser
+  trackUser,
+  restoreTokenFromStorage
 } from '../services/authService';
 
 /**
@@ -35,22 +36,42 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
   const [accessToken, setAccessToken] = useState(null);
 
-  // Listen to Firebase auth state changes
+  // Listen to Firebase auth state changes + restore token from storage
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      setUser(firebaseUser);
-      setLoading(false);
-
-      // If we already have a cached token (from the current session), use it
-      if (firebaseUser) {
-        const cached = getAccessToken();
-        if (cached) setAccessToken(cached);
-      } else {
-        setAccessToken(null);
+    let isMounted = true;
+    
+    const initAuth = async () => {
+      // Try to restore persisted token first
+      const persistedToken = await restoreTokenFromStorage();
+      if (isMounted && persistedToken) {
+        setAccessToken(persistedToken);
       }
-    });
+      
+      const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+        if (!isMounted) return;
+        
+        setUser(firebaseUser);
 
-    return unsubscribe;
+        // If we already have a cached token (from the current session), use it
+        if (firebaseUser) {
+          const cached = getAccessToken();
+          if (cached) setAccessToken(cached);
+        } else {
+          setAccessToken(null);
+        }
+        
+        setLoading(false);
+      });
+
+      return unsubscribe;
+    };
+    
+    const unsubscribePromise = initAuth();
+    
+    return () => {
+      isMounted = false;
+      unsubscribePromise.then(unsub => unsub?.());
+    };
   }, []);
 
   /**

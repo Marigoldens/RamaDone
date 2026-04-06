@@ -283,17 +283,15 @@ function detectModeFromMessage(message) {
   // Find the mode(s) with hits
   const matched = Object.entries(hits).filter(([, count]) => count > 0);
 
-  // Single domain match → route to that scoped mode
+  // Single domain match → route to that scoped mode for efficiency
   if (matched.length === 1) return matched[0][0];
 
-  // Multiple domains → find the strongest signal
-  if (matched.length > 1) {
-    matched.sort((a, b) => b[1] - a[1]);
-    // Only route if winner is clearly dominant (2× the next)
-    if (matched[0][1] >= 2 * (matched[1]?.[1] ?? 0)) return matched[0][0];
-  }
+  // Multiple domains detected → ALWAYS use 'all' mode so AI has every tool.
+  // A scoped mode would silently drop actions outside its domain (e.g. logging a
+  // workout AND expenses in one message would lose the workout if routed to expenses).
+  if (matched.length > 1) return 'all';
 
-  // Ambiguous or no match → use full 'all' mode
+  // No match → use full 'all' mode
   return 'all';
 }
 

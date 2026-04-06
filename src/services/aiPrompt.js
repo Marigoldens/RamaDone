@@ -85,20 +85,40 @@ When the user says "Iftar" use Maghrib time. When they say "Suhoor" suggest ~30�
 
 // ─── Productivity Data Snapshot ───────────────────────────────────────────────
 export function buildProductivityContext(productivityData, todayStr) {
-  const { tasks = [], expenses = [], habits = [], habitLogs = [] } = productivityData;
+  const { tasks = [], expenses = [], habits = [], habitLogs = [], workoutPlans = [] } = productivityData;
 
   const pendingTasks = tasks.filter(t => t.status !== 'done');
   const todayExpenses = expenses.filter(e => e.date === todayStr && e.type === 'expense');
   const todaySpend = todayExpenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
   const todayLogs = habitLogs.filter(l => l.date === todayStr && l.completed);
+  const doneIds = new Set(todayLogs.map(l => l.habitId));
+
+  // Build task list with IDs so AI can act without a query round-trip
+  const taskLines = pendingTasks.slice(0, 15).map(t =>
+    `  [id:${t.id}] [${t.priority}] ${t.title}${t.dueDate ? ` (due ${t.dueDate})` : ''} — ${t.status}`
+  ).join('\n');
+
+  // Build habit list with IDs + today status so AI can log without querying
+  const habitLines = habits.slice(0, 15).map(h => {
+    const done = doneIds.has(h.id);
+    return `  [habitId:${h.id}] ${h.emoji || '🎯'} ${h.name} (${h.frequency}) — ${done ? '✅ done' : '⬜ pending'}`;
+  }).join('\n');
+
+  // Workout plans summary
+  const planLines = workoutPlans.slice(0, 8).map(p => `  [id:${p.id}] ${p.name} (${p.type})`).join('\n');
 
   return `
-=== PRODUCTIVITY SNAPSHOT (today ${todayStr}) ===
-Tasks      : ${pendingTasks.length} pending  |  IDs available — call query_tasks for details
-Expenses   : ${todayExpenses.length} logged today · Total spend today: ${todaySpend.toFixed(2)}
-Habits     : ${todayLogs.length}/${habits.length} completed today (${habits.length > 0 ? Math.round(todayLogs.length / habits.length * 100) : 0}%)
-${pendingTasks.slice(0, 5).map(t => `  • [${t.priority}] ${t.title}${t.dueDate ? ` (due ${t.dueDate})` : ''}`).join("\n")}
-=== END SNAPSHOT ===`;
+=== PRODUCTIVITY CONTEXT (today ${todayStr}) ===
+
+PENDING TASKS (${pendingTasks.length} total) — USE THESE IDs IN update_task WITHOUT calling query_tasks first:
+${taskLines || '  (none)'}
+
+HABITS — today's status — USE habitId IN log_habit/update_habit WITHOUT calling query_habits first:
+${habitLines || '  (none)'}
+
+EXPENSES today: ${todayExpenses.length} entries · ${Math.round(todaySpend).toLocaleString()} IQD spent
+${workoutPlans.length > 0 ? `\nWORKOUT PLANS — USE id IN update_workout_plan WITHOUT calling query_workout_plans first:\n${planLines}` : ''}
+=== END CONTEXT ===`;
 }
 
 // ─── Full System Prompt ───────────────────────────────────────────────────────
@@ -157,26 +177,41 @@ Examples:
 SCHEDULING RULES:
 ${ramadanRules}
 - BATCHING (CRITICAL): If the user asks for MULTIPLE actions, output ALL function calls simultaneously in ONE response.
-- MULTI-TYPE REQUESTS (CRITICAL): When the user asks for DIFFERENT types of items (e.g., "make 3 habits, 5 events, 2 tasks"), you MUST call tools for ALL types in ONE response. Do NOT stop after one type. Call ALL relevant tools: add_habit, add_event, add_task, add_expense, add_workout_plan, add_workout_log — whatever the user requested.
-- Example: "make 2 habits, 3 events, and log an expense" → call add_habit twice, add_event three times, add_expense once — ALL in ONE response.
+- MULTI-TYPE REQUESTS (CRITICAL): When the user's message touches MULTIPLE domains (calendar + tasks + expenses + habits + gym), call tools for EVERY domain in ONE single response. Do NOT focus on just one type and ignore the rest.
+  Example A: "log 50k food, 10k taxi, mark reading habit done, finished report task, did bench press 3×10" → add_expense×2 + log_habit + update_task + add_workout_log — ALL 5 calls in ONE response.
+  Example B: "add study sessions Mon-Sun 8-10PM, gym Mon/Wed/Fri 6-7:30PM, Friday dinner 7PM, tasks: write notes, buy protein" → add_event×7 (study) + add_event×3 (gym) + add_event×1 (dinner) + add_task×2 — 13 tool calls in ONE response.
+  Example C: "I got paid 500k, bought groceries 30k, call mom task" → add_expense (income) + add_expense + add_task — 3 calls in ONE response.
+- DIRECT ACTION (CRITICAL): The PRODUCTIVITY CONTEXT above contains task IDs and habitIds. Use them DIRECTLY — do NOT call query_tasks/query_habits when IDs are already provided. Only query when you need IDs not in the context.
 - SKIPPING CHECKS: For multi-event requests, you may skip 'check_conflicts' if slots are obviously distinct.
 - When intent is clear for a single event, call check_conflicts ONCE then immediately call add_event.
 - When the user asks "what's my day?" or "what's on?", call get_day_narrative.
 - When the user asks for a free slot, use find_free_slots.
 
 TASK RULES:
-- Call query_tasks before update_task or delete_task to find the correct ID.
+- If the task ID is already in the PRODUCTIVITY CONTEXT above, use it DIRECTLY in update_task/delete_task — do NOT call query_tasks first.
+- Only call query_tasks when the user references a task whose ID is not in the context (e.g. by a vague description).
 - Status values: 'todo', 'in-progress', 'done'. Priority: 'low', 'medium', 'high'.
 
 EXPENSE RULES:
 - Call query_expenses before update_expense or delete_expense to find the id.
 - type must be 'expense' or 'income'.
 - To change amount/category/note/date, use update_expense.
+- CURRENCY: All amounts are in IQD (Iraqi Dinar). NEVER use USD or any other currency.
+- AMOUNT NOTATION: "k" means × 1000. Examples: 50k = 50000, 30k = 30000, 1.5k = 1500, 100k = 100000.
+- MULTI-EXPENSE (CRITICAL): When the user mentions MULTIPLE spending amounts in one message, call add_expense SEPARATELY for EACH one in the SAME response.
+  Example: "I spent 50k on food, 30k at the mall, and 10k on transport" → THREE separate add_expense calls: {amount:"50000",category:"Food"}, {amount:"30000",category:"Shopping"}, {amount:"10000",category:"Transport"} — ALL in ONE response.
+  Example: "paid 20k for electricity and 15k for groceries" → TWO add_expense calls.
 
 HABIT RULES:
 - Use add_habit to create new habits. Use delete_habit to archive them.
 - To rename or change a habit's emoji/category/frequency, use update_habit.
-- Call query_habits first to find habitId before log_habit, update_habit, or delete_habit.
+- If habitId is in the PRODUCTIVITY CONTEXT above, use it directly. Only call query_habits when you need an ID not shown.
+
+WORKOUT PLAN RULES (CRITICAL — PREVENTS HALLUCINATION):
+- Create EXACTLY the number of plans the user requests. If user says "Push, Pull, Legs" → 3 plans only.
+- Use EXACTLY the names the user gave. Do NOT invent extra plans or rename them.
+- Example: "Push (bench, OHP, triceps), Pull (rows, curls), Legs (squats, press)" → 3 plans named 'Push Day', 'Pull Day', 'Legs Day' with the listed exercises.
+- Never add 'Upper Body', 'Full Body', or other plans unless explicitly requested.
 
 ${temporalContext}
 
@@ -272,10 +307,13 @@ ${EDIT}
 - type must be 'expense' or 'income'.
 - Call query_expenses before update/delete to find the id.
 - Categories: Food, Transport, Health, Utilities, Shopping, Entertainment, Other.
+- CURRENCY: All amounts are in IQD (Iraqi Dinar). NEVER use USD or any other currency.
+- AMOUNT NOTATION: "k" means × 1000. Examples: 50k = 50000, 30k = 30000, 1.5k = 1500.
+- MULTI-EXPENSE (CRITICAL): When the user mentions MULTIPLE spending amounts in one message, call add_expense SEPARATELY for EACH one in the SAME response. Example: "spent 50k food, 30k mall, 10k transport" → THREE add_expense calls in ONE response.
 
 ${temporalContext}
 
-Today (${todayStr}): spent ${todaySpend.toFixed(2)} (${todayExp.length} entries), earned ${todayEarn.toFixed(2)} (${todayInc.length} entries)`;
+Today (${todayStr}): spent ${Math.round(todaySpend).toLocaleString()} IQD (${todayExp.length} entries), earned ${Math.round(todayEarn).toLocaleString()} IQD (${todayInc.length} entries)`;
   }
 
   if (mode === 'habits') {
@@ -292,7 +330,7 @@ Tools: add_habit, update_habit, delete_habit, log_habit, query_habits.
 ${CONFIRM}
 ${EDIT}
 - add_habit to create. delete_habit to archive. update_habit to rename/change emoji/frequency.
-- Call query_habits first to find habitId before log_habit, update_habit, or delete_habit.
+- IDs ARE LISTED BELOW — use habitId directly in log_habit/update_habit/delete_habit. Only call query_habits if the user references a habit not listed below.
 
 ${temporalContext}
 
@@ -310,22 +348,29 @@ ${list || '  (no habits yet)'}`;
     return `${greeting} — a gym & workout tracking assistant.
 ${personality}
 
-Tools: add_workout_plan, update_workout_plan, delete_workout_plan, query_workout_plans, add_workout_log, delete_workout_log, query_workout_logs, get_exercise_progression.
+Tools: add_workout_plan, update_workout_plan, delete_workout_plan, query_workout_plans, add_workout_log, delete_workout_log, query_workout_logs, get_exercise_progression, add_habit, update_habit, delete_habit, log_habit, query_habits.
 
 ${CONFIRM}
 ${EDIT}
-- BATCHING (CRITICAL): If the user asks for a MULTI-DAY split (e.g., 3-day PPL, 4-day Upper/Lower), you MUST output MULTIPLE \`add_workout_plan\` calls simultaneously in ONE response (one call for each day/plan).
+- BATCHING (CRITICAL): When user asks for multiple plans (PPL, 4-day split, etc.), call add_workout_plan ONCE PER PLAN in the SAME response. ALL plans in ONE response.
+- PLAN NAMING (CRITICAL): Create EXACTLY the plans the user requested with EXACTLY their names. Never invent extra plans. 'Push, Pull, Legs' → 3 plans only.
 - Plan types: Push, Pull, Legs, Upper, Lower, Full Body, Cardio, Custom.
 - Each plan has exercises with name, sets, reps, targetWeight.
-- Workout logs record completed sessions with exercises and sets (weight + reps). Use get_exercise_progression to check PRs and strength progress.
-- Call query_workout_plans before update/delete to find the id.
-- Call query_workout_logs before delete_workout_log to find the id.
+- Workout logs record completed sessions with exercises and sets (weight + reps). Use get_exercise_progression to check PRs.
+- Plan IDs ARE LISTED BELOW — use them in update_workout_plan directly. Only query when ID not listed.
+- Habit tools are available: use add_habit to create gym habits (e.g. 'workout 5x/week'). habitIds listed below.
 
 ${temporalContext}
 
 Saved plans (${workoutPlans.length} total):
 ${planList || '  (no plans yet)'}
-Recent workouts (last 7 days): ${recentLogs.length} sessions`;
+Recent workouts (last 7 days): ${recentLogs.length} sessions
+
+HABITS (use habitId directly in log_habit):
+${habits.slice(0, 10).map(h => {
+  const done = habitLogs.some(l => l.habitId === h.id && l.date === todayStr && l.completed);
+  return `  [habitId:${h.id}] ${h.emoji || '\ud83c\udfaf'} ${h.name} — ${done ? '\u2705 done' : '\u2b1c pending'}`;
+}).join('\n') || '  (none)'}`;
   }
 
   // Fallback
