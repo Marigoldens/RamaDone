@@ -1,4 +1,3 @@
-import { useState, useEffect, useRef } from 'react';
 import {
   LayoutDashboard, Calendar, CheckSquare, Wallet,
   Target, Clock, MessageCircle, Settings, Dumbbell, Shield
@@ -19,14 +18,13 @@ const ALL_TABS_BASE = [
 ];
 
 /**
- * Slim bottom nav — shows all icons, no More button.
- * Hides on scroll-down, reappears on scroll-up.
+ * Slim bottom nav — always visible, compact design.
+ * Icons only on mobile, labels on desktop sidebar.
+ * No auto-hide — the bar is thin enough to never be in the way.
  */
 export default function BottomNav({ activeTab, onTabChange, user }) {
   const { prefs, getPref } = usePreferences();
   const handedness = getPref('handedness');
-  const [visible, setVisible] = useState(true);
-  const lastDeltaRef = useRef(0);
 
   const TABS = ALL_TABS_BASE.filter(t => {
     if (t.prayerOnly && !prefs.prayerMode) return false;
@@ -35,42 +33,14 @@ export default function BottomNav({ activeTab, onTabChange, user }) {
     return true;
   });
 
-  // ── Scroll-hide: listen to wheel (desktop) + touch (mobile) ──
-  useEffect(() => {
-    // Wheel (desktop + trackpad)
-    function onWheel(e) {
-      if (e.deltaY > 4)       setVisible(false); // scrolling down → hide
-      else if (e.deltaY < -4) setVisible(true);  // scrolling up   → show
-    }
-
-    // Touch (mobile swipe)
-    let touchStartY = 0;
-    function onTouchStart(e) { touchStartY = e.touches[0].clientY; }
-    function onTouchMove(e) {
-      const diff = touchStartY - e.touches[0].clientY;
-      if (diff > 8)       setVisible(false);
-      else if (diff < -8) setVisible(true);
-    }
-
-    window.addEventListener('wheel',      onWheel,      { passive: true });
-    window.addEventListener('touchstart', onTouchStart, { passive: true });
-    window.addEventListener('touchmove',  onTouchMove,  { passive: true });
-
-    return () => {
-      window.removeEventListener('wheel',      onWheel);
-      window.removeEventListener('touchstart', onTouchStart);
-      window.removeEventListener('touchmove',  onTouchMove);
-    };
-  }, []);
-
   return (
-    <nav className={`app-nav ${visible ? 'app-nav--visible' : 'app-nav--hidden'} app-nav--${handedness}`}>
+    <nav className={`app-nav app-nav--${handedness}`}>
       {TABS.map(({ id, label, icon: Icon, isFab }) => {
         const active = activeTab === id;
         return (
           <button
             key={id}
-            onClick={() => { onTabChange(id); setVisible(true); }}
+            onClick={() => onTabChange(id)}
             className={`nav-tab ${active ? 'nav-tab--active' : 'nav-tab--inactive'} ${isFab ? 'nav-tab--fab' : ''}`}
             title={label}
           >

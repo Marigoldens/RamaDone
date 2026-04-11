@@ -787,11 +787,48 @@ export default function ChatView({ user, accessToken }) {
     setChatMode(newMode);
   };
 
+  // ── Mobile swipe gestures for sidebar ──────────────────────────────────────
+  const swipeRef = useRef({ startX: 0, startY: 0, tracking: false });
+  
+  const handleTouchStart = useCallback((e) => {
+    const touch = e.touches[0];
+    const isEdge = touch.clientX < 40; // Left edge zone
+    const isSidebarOrBackdrop = isSidebarOpen;
+    
+    if (isEdge || isSidebarOrBackdrop) {
+      swipeRef.current = { startX: touch.clientX, startY: touch.clientY, tracking: true };
+    }
+  }, [isSidebarOpen]);
+
+  const handleTouchEnd = useCallback((e) => {
+    if (!swipeRef.current.tracking) return;
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - swipeRef.current.startX;
+    const dy = Math.abs(touch.clientY - swipeRef.current.startY);
+    swipeRef.current.tracking = false;
+
+    // Ignore if vertical movement is too large (user was scrolling)
+    if (dy > 50) return;
+
+    // Swipe right from left edge → open sidebar
+    if (dx > 60 && swipeRef.current.startX < 40 && !isSidebarOpen) {
+      setIsSidebarOpen(true);
+    }
+    // Swipe left → close sidebar
+    if (dx < -60 && isSidebarOpen) {
+      setIsSidebarOpen(false);
+    }
+  }, [isSidebarOpen]);
+
   return (
-    <div className="chat-root flex-col">
+    <div
+      className="chat-root flex-col"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
       {/* Unified Top Header Ribbon */}
       <header className="chat-header unified-header relative flex items-center justify-start md:justify-center w-full border-b border-[var(--c-border)] bg-[var(--c-surface)] z-10">
-        <div className="flex justify-start md:justify-center flex-1 w-full">
+        <div className="flex justify-start md:justify-center flex-1 w-full overflow-hidden min-w-0">
           <ChatModeBar
             activeMode={currentMode}
             onModeChange={handleModeChange}

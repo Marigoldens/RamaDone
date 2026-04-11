@@ -18,7 +18,7 @@ export default function ChatMessageList({ messages, loading, scrollRef, onConfir
           >
             <div 
               className={`chat-avatar ${msg.role === 'user' ? 'chat-avatar--user' : ''}`}
-              style={msg.role !== 'user' ? { background: `var(--color-mode-${activeMode || 'all'})`, color: 'white' } : {}}
+              style={msg.role !== 'user' ? { background: `var(--c-mode-${activeMode || 'all'})`, color: 'white' } : {}}
             >
               {msg.role === 'user'
                 ? <User className="w-4 h-4 text-accent" />

@@ -242,68 +242,130 @@ export default function ChatSidebar({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [allSessions, focusedIndex, bulkMode, activeSessionId]);
 
+  // ── Swipe-to-delete state for session rows ──
+  const sessionSwipeRef = useRef({ id: null, startX: 0, startY: 0 });
+  const [swipingId, setSwipingId] = useState(null);
+  const [swipeOffset, setSwipeOffset] = useState(0);
+
+  const handleSessionTouchStart = (e, sessionId) => {
+    if (bulkMode) return;
+    const touch = e.touches[0];
+    sessionSwipeRef.current = { id: sessionId, startX: touch.clientX, startY: touch.clientY };
+  };
+
+  const handleSessionTouchMove = (e) => {
+    const { id, startX, startY } = sessionSwipeRef.current;
+    if (!id) return;
+    const touch = e.touches[0];
+    const dy = Math.abs(touch.clientY - startY);
+    const dx = touch.clientX - startX;
+    // If vertical movement is dominant, cancel swipe (user is scrolling)
+    if (dy > 30 && Math.abs(dx) < dy) {
+      sessionSwipeRef.current.id = null;
+      setSwipingId(null);
+      setSwipeOffset(0);
+      return;
+    }
+    // Only allow left swipe (negative dx)
+    if (dx < -10) {
+      setSwipingId(id);
+      setSwipeOffset(Math.min(0, dx));
+    }
+  };
+
+  const handleSessionTouchEnd = (session) => {
+    const { id } = sessionSwipeRef.current;
+    if (!id) return;
+    sessionSwipeRef.current.id = null;
+    // If swiped past threshold, delete
+    if (swipeOffset < -100) {
+      handleDelete(session);
+    }
+    // Reset
+    setSwipingId(null);
+    setSwipeOffset(0);
+  };
+
   // ── Render a single session row ──
   const renderSession = (session) => {
     const isActive = session.id === activeSessionId;
     const isSelected = selectedIds.has(session.id);
-    const modeColor = `var(--color-mode-${session.mode || 'all'})`;
+    const modeColor = `var(--c-mode-${session.mode || 'all'})`;
     const ModeIcon = MODE_ICONS[session.mode] || MODE_ICONS.all;
     const refIndex = allSessions.findIndex(s => s.id === session.id);
+    const isSwiping = swipingId === session.id;
+    const offset = isSwiping ? swipeOffset : 0;
 
     return (
-      <div
-        key={session.id}
-        className={`chat-session-item ${isActive ? 'chat-session-item--active' : ''} ${isSelected ? 'chat-session-item--selected' : ''} ${bulkMode ? 'chat-session-item--bulk' : ''}`}
-        onClick={() => handleSelect(session.id)}
-        ref={el => itemRefs.current[refIndex] = el}
-        tabIndex={refIndex === focusedIndex ? 0 : -1}
-        onFocus={() => setFocusedIndex(refIndex)}
-        role="button"
-        aria-selected={isSelected}
-      >
-        {/* Mode accent stripe */}
-        <span className="chat-session-stripe" style={{ backgroundColor: modeColor }} />
-
-        {/* Checkbox in bulk mode */}
-        {bulkMode && (
-          <div className="chat-session-checkbox">
-            {isSelected ? (
-              <CheckSquare size={14} style={{ color: modeColor }} />
-            ) : (
-              <Square size={14} className="chat-session-checkbox-empty" />
-            )}
-          </div>
-        )}
-
-        {/* Icon coloured by mode */}
-        <ModeIcon size={18} className="chat-session-icon" style={{ color: modeColor }} />
-
-        {/* Title row */}
-        <div className="chat-session-info">
-          <span className="chat-session-title">{session.title || 'Untitled'}</span>
+      <div key={session.id} className="chat-session-swipe-wrapper">
+        {/* Red delete zone behind */}
+        <div
+          className="chat-session-swipe-delete"
+          style={{ opacity: isSwiping ? Math.min(1, Math.abs(offset) / 100) : 0 }}
+        >
+          <Trash2 size={16} />
+          <span>Delete</span>
         </div>
+        <div
+          className={`chat-session-item ${isActive ? 'chat-session-item--active' : ''} ${isSelected ? 'chat-session-item--selected' : ''} ${bulkMode ? 'chat-session-item--bulk' : ''}`}
+          onClick={() => handleSelect(session.id)}
+          onTouchStart={(e) => handleSessionTouchStart(e, session.id)}
+          onTouchMove={handleSessionTouchMove}
+          onTouchEnd={() => handleSessionTouchEnd(session)}
+          ref={el => itemRefs.current[refIndex] = el}
+          tabIndex={refIndex === focusedIndex ? 0 : -1}
+          onFocus={() => setFocusedIndex(refIndex)}
+          role="button"
+          aria-selected={isSelected}
+          style={{
+            transform: isSwiping ? `translateX(${offset}px)` : 'translateX(0)',
+            transition: isSwiping ? 'none' : 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          }}
+        >
+          {/* Mode accent stripe */}
+          <span className="chat-session-stripe" style={{ backgroundColor: modeColor }} />
 
-        {/* Time + Actions at the end */}
-        <div className="chat-session-meta">
-          {!bulkMode && (
-            <div className="chat-session-actions-inline">
-              <button
-                className={`chat-session-star ${session.starred ? 'chat-session-star--active' : ''}`}
-                onClick={(e) => { e.stopPropagation(); toggleStar(session.id); }}
-                aria-label={session.starred ? 'Unstar chat' : 'Star chat'}
-              >
-                <Star size={14} fill={session.starred ? 'currentColor' : 'none'} />
-              </button>
-              <button
-                className="chat-session-delete"
-                onClick={(e) => { e.stopPropagation(); handleDelete(session); }}
-                aria-label="Delete chat"
-              >
-                <Trash2 size={14} />
-              </button>
+          {/* Checkbox in bulk mode */}
+          {bulkMode && (
+            <div className="chat-session-checkbox">
+              {isSelected ? (
+                <CheckSquare size={14} style={{ color: modeColor }} />
+              ) : (
+                <Square size={14} className="chat-session-checkbox-empty" />
+              )}
             </div>
           )}
-          <span className="chat-session-time">{formatTimeAgo(session.updatedAt)}</span>
+
+          {/* Icon coloured by mode */}
+          <ModeIcon size={18} className="chat-session-icon" style={{ color: modeColor }} />
+
+          {/* Title row */}
+          <div className="chat-session-info">
+            <span className="chat-session-title">{session.title || 'Untitled'}</span>
+          </div>
+
+          {/* Time + Actions at the end */}
+          <div className="chat-session-meta">
+            {!bulkMode && (
+              <div className="chat-session-actions-inline">
+                <button
+                  className={`chat-session-star ${session.starred ? 'chat-session-star--active' : ''}`}
+                  onClick={(e) => { e.stopPropagation(); toggleStar(session.id); }}
+                  aria-label={session.starred ? 'Unstar chat' : 'Star chat'}
+                >
+                  <Star size={14} fill={session.starred ? 'currentColor' : 'none'} />
+                </button>
+                <button
+                  className="chat-session-delete"
+                  onClick={(e) => { e.stopPropagation(); handleDelete(session); }}
+                  aria-label="Delete chat"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            )}
+            <span className="chat-session-time">{formatTimeAgo(session.updatedAt)}</span>
+          </div>
         </div>
       </div>
     );

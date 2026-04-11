@@ -379,13 +379,20 @@
 
 html {
   scroll-behavior: smooth;
+  overflow: hidden;
+  overscroll-behavior: none;
+  height: 100%;
 }
 
 body {
   font-family: var(--font-sans);
   background-color: var(--c-surface);
   color: var(--c-text);
-  min-height: 100dvh;
+  height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
+  position: fixed;
+  width: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

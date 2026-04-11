@@ -1,4 +1,5 @@
 import { Sparkles, Calendar, CheckSquare, Wallet, Target, Dumbbell, Lock } from 'lucide-react';
+import { useRef, useEffect } from 'react';
 
 export const CHAT_MODES = [
   { id: 'all',      label: 'All',      Icon: Sparkles,    color: 'all' },
@@ -65,9 +66,19 @@ export const MODE_PLACEHOLDERS = {
  * Horizontal pill-button bar for picking a chat mode.
  * Shows a lock icon when the user has manually selected a non-'all' mode
  * to communicate that AI auto-detection is disabled.
+ * Auto-scrolls active pill into view on mobile.
  */
 export default function ChatModeBar({ activeMode, onModeChange, leftElement }) {
   const isLocked = activeMode !== 'all';
+  const pillRefs = useRef({});
+
+  // Auto-scroll active pill into view when mode changes
+  useEffect(() => {
+    const el = pillRefs.current[activeMode];
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
+  }, [activeMode]);
 
   return (
     <div className="chat-mode-bar" role="toolbar" aria-label="Chat mode selector">
@@ -77,6 +88,7 @@ export default function ChatModeBar({ activeMode, onModeChange, leftElement }) {
         return (
           <button
             key={id}
+            ref={el => pillRefs.current[id] = el}
             onClick={() => onModeChange(id)}
             aria-pressed={isActive}
             aria-label={`${label} mode`}
